@@ -1,0 +1,782 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stakeholder-Map</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --text: #1d2330;
+    --muted: #667085;
+    --border: #d9dde5;
+    --accent: #2f6fde;
+    --q-high: #fdecec;
+    --q-sat: #fff6e5;
+    --q-inf: #e9f2ff;
+    --q-mon: #f1f3f6;
+    --pro: #1f9d55;
+    --neu: #8a94a6;
+    --con: #d64545;
+    --warn: #b7791f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14171d;
+      --panel: #1c2028;
+      --text: #e6e9ef;
+      --muted: #98a2b3;
+      --border: #333a47;
+      --accent: #6b9cff;
+      --q-high: #3a2427;
+      --q-sat: #3a3122;
+      --q-inf: #1f2b40;
+      --q-mon: #232833;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+    padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 10;
+  }
+  header h1 { font-size: 18px; margin: 0 12px 0 0; }
+  .file-info { display: flex; flex-direction: column; margin-right: auto; min-width: 0; }
+  .file-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .status { font-size: 12px; color: var(--muted); }
+  .status.dirty { color: var(--warn); }
+  .status.error { color: var(--con); }
+  button {
+    font: inherit; padding: 6px 12px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--panel); color: var(--text);
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.danger:hover { border-color: var(--con); color: var(--con); }
+  .banner {
+    margin: 12px 20px 0; padding: 10px 14px; border-radius: 8px;
+    background: var(--q-inf); border: 1px solid var(--border);
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  }
+  .banner[hidden] { display: none; }
+  main { padding: 16px 20px 40px; display: grid; gap: 16px; }
+  .board { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 16px; align-items: start; }
+  @media (max-width: 900px) { .board { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+  .card h2 { font-size: 15px; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+  .card h2 .count { color: var(--muted); font-weight: normal; }
+
+  /* Matrix */
+  .matrix-wrap { display: grid; grid-template-columns: 28px 1fr; grid-template-rows: 1fr 28px; gap: 4px; }
+  .y-axis, .x-axis { color: var(--muted); font-size: 12px; display: flex; justify-content: space-between; align-items: center; }
+  .y-axis { writing-mode: vertical-rl; transform: rotate(180deg); }
+  .x-axis { grid-column: 2; }
+  .axis-title { font-weight: 600; color: var(--text); }
+  .plane {
+    position: relative; width: 100%; aspect-ratio: 4 / 3; max-height: 70vh;
+    display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+    border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+  }
+  .plane.over { outline: 3px dashed var(--accent); outline-offset: 2px; }
+  .quadrant { padding: 8px 10px; font-size: 12px; color: var(--muted); }
+  .quadrant strong { display: block; color: var(--text); font-size: 13px; }
+  .q-sat { background: var(--q-sat); border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .q-high { background: var(--q-high); border-bottom: 1px solid var(--border); text-align: right; }
+  .q-mon { background: var(--q-mon); border-right: 1px solid var(--border); }
+  .q-inf { background: var(--q-inf); text-align: right; }
+  .q-mon, .q-inf { display: flex; flex-direction: column; justify-content: flex-end; }
+
+  /* Stakeholder-Chips */
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; cursor: grab; user-select: none;
+    touch-action: none; max-width: 160px;
+  }
+  .chip .dot {
+    flex: none; min-width: 30px; height: 30px; padding: 0 5px; border-radius: 15px;
+    display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 11px;
+    background: var(--neu); border: 2px solid var(--panel); box-shadow: 0 1px 3px rgba(0,0,0,.3);
+  }
+  .chip[data-attitude="pro"] .dot { background: var(--pro); }
+  .chip[data-attitude="con"] .dot { background: var(--con); }
+  .chip .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+  .plane .chip {
+    position: absolute; transform: translate(-15px, -50%); z-index: 1;
+  }
+  .plane .chip .label {
+    background: var(--panel); padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border);
+  }
+  .chip.selected .dot { outline: 3px solid var(--accent); outline-offset: 1px; }
+  .chip.selected { z-index: 3; }
+  .chip.dragging { opacity: .3; }
+  .chip.ghost {
+    position: fixed; z-index: 1000; pointer-events: none; cursor: grabbing;
+    transform: translate(-15px, -50%);
+  }
+  .chip.ghost .label { background: var(--panel); padding: 1px 6px; border-radius: 4px; border: 1px solid var(--accent); }
+
+  .pool { min-height: 120px; display: flex; flex-direction: column; gap: 8px; padding: 8px; border-radius: 8px; border: 1px dashed var(--border); }
+  .pool.over { border-color: var(--accent); background: var(--q-inf); }
+  .pool .empty { color: var(--muted); font-size: 12px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; font-size: 12px; color: var(--muted); }
+  .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+  .legend .l-pro::before { background: var(--pro); }
+  .legend .l-neu::before { background: var(--neu); }
+  .legend .l-con::before { background: var(--con); }
+  .hint { color: var(--muted); font-size: 12px; margin: 10px 0 0; }
+
+  /* Tabelle */
+  .table-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .table-head h2 { margin: 0 auto 0 0; }
+  .table-head input[type="search"] { width: 220px; }
+  .table-scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-size: 12px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+  tr.selected td { background: var(--q-inf); }
+  input, select, textarea {
+    font: inherit; color: var(--text); background: transparent; width: 100%;
+    border: 1px solid transparent; border-radius: 4px; padding: 4px 6px;
+  }
+  input:hover, select:hover, textarea:hover { border-color: var(--border); }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); background: var(--panel); }
+  select { background: var(--panel); }
+  textarea { resize: vertical; min-height: 30px; }
+  .table-head input[type="search"] { border-color: var(--border); }
+  td.quad { white-space: nowrap; color: var(--muted); padding-top: 9px; }
+  td.actions { width: 1%; white-space: nowrap; }
+  .col-name { min-width: 160px; }
+  .col-notes { min-width: 220px; }
+  .col-short { width: 80px; }
+  .no-rows td { color: var(--muted); text-align: center; padding: 20px; }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Stakeholder-Map</h1>
+  <div class="file-info">
+    <span class="file-name" id="fileName">Keine Datei</span>
+    <span class="status" id="status">Noch nicht gespeichert</span>
+  </div>
+  <button id="btnNew" type="button">Neu</button>
+  <button id="btnOpen" type="button">Datei öffnen…</button>
+  <button id="btnSave" type="button" class="primary">Speichern</button>
+  <button id="btnSaveAs" type="button">Speichern unter…</button>
+  <input id="fileInput" type="file" accept=".json,application/json" class="visually-hidden">
+</header>
+
+<div class="banner" id="reopenBanner" hidden>
+  <span>Zuletzt verwendete Datei: <strong id="reopenName"></strong></span>
+  <button id="btnReopen" type="button" class="primary">Wieder öffnen</button>
+  <button id="btnDismiss" type="button">Ignorieren</button>
+</div>
+<div class="banner" id="fallbackBanner" hidden>
+  <span>Dieser Browser kann Dateien nicht direkt überschreiben. „Speichern“ lädt die Datei herunter –
+    ersetze damit deine bisherige Datei. Für automatisches Speichern Chrome oder Edge verwenden.</span>
+</div>
+
+<main>
+  <section class="board">
+    <div class="card">
+      <h2>Einfluss-/Interesse-Matrix</h2>
+      <div class="matrix-wrap">
+        <div class="y-axis"><span>niedrig</span><span class="axis-title">Einfluss</span><span>hoch</span></div>
+        <div class="plane" id="plane">
+          <div class="quadrant q-sat"><strong>Zufriedenstellen</strong>hoher Einfluss, geringes Interesse</div>
+          <div class="quadrant q-high"><strong>Eng einbinden</strong>hoher Einfluss, hohes Interesse</div>
+          <div class="quadrant q-mon"><strong>Beobachten</strong>geringer Einfluss, geringes Interesse</div>
+          <div class="quadrant q-inf"><strong>Informieren</strong>geringer Einfluss, hohes Interesse</div>
+        </div>
+        <div class="x-axis"><span>niedrig</span><span class="axis-title">Interesse</span><span>hoch</span></div>
+      </div>
+      <div class="legend">
+        <span class="l-pro">Unterstützer</span>
+        <span class="l-neu">Neutral</span>
+        <span class="l-con">Kritiker</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Nicht platziert <span class="count" id="poolCount"></span></h2>
+      <div class="pool" id="pool"></div>
+      <p class="hint">Stakeholder in die Matrix ziehen. Zurück hierher ziehen, um sie aus der Matrix zu entfernen.
+        Klick auf einen Stakeholder markiert die Zeile in der Liste.</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="table-head">
+      <h2>Stakeholderliste <span class="count" id="listCount"></span></h2>
+      <input type="search" id="search" placeholder="Suchen…" aria-label="Stakeholder suchen">
+      <button id="btnAdd" type="button" class="primary">+ Stakeholder</button>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th class="col-name">Name</th>
+            <th class="col-short" title="Leer lassen, um die Initialen des Namens zu verwenden">Kürzel</th>
+            <th>Rolle</th>
+            <th>Organisation</th>
+            <th>Haltung</th>
+            <th>Quadrant</th>
+            <th class="col-notes">Notizen / Maßnahmen</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script>
+'use strict';
+
+const FILE_TYPES = [{ description: 'Stakeholder-Daten (JSON)', accept: { 'application/json': ['.json'] } }];
+const HAS_FS_API = 'showOpenFilePicker' in window && 'showSaveFilePicker' in window;
+const ATTITUDES = [
+  { value: 'pro', label: 'Unterstützer' },
+  { value: 'neutral', label: 'Neutral' },
+  { value: 'con', label: 'Kritiker' },
+];
+
+let stakeholders = [];
+let fileHandle = null;      // FileSystemFileHandle (Chrome/Edge)
+let fileName = null;        // Anzeigename bzw. Name für den Download
+let dirty = false;
+let saveTimer = null;
+let selectedId = null;
+
+const $ = (id) => document.getElementById(id);
+const plane = $('plane');
+const pool = $('pool');
+const rows = $('rows');
+
+// ---------- Datenmodell ----------
+
+function uid() {
+  return 's-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+}
+
+function byId(id) {
+  return stakeholders.find((s) => s.id === id);
+}
+
+function isPlaced(s) {
+  return typeof s.x === 'number' && typeof s.y === 'number';
+}
+
+function quadrantOf(s) {
+  if (!isPlaced(s)) return '–';
+  const highPower = s.y >= 0.5;
+  const highInterest = s.x >= 0.5;
+  if (highPower && highInterest) return 'Eng einbinden';
+  if (highPower) return 'Zufriedenstellen';
+  if (highInterest) return 'Informieren';
+  return 'Beobachten';
+}
+
+function initials(name) {
+  const parts = (name || '?').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '?';
+  return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
+}
+
+// Eigenes Kürzel, sonst die Initialen des Namens.
+function shortOf(s) {
+  return s.short.trim() || initials(s.name);
+}
+
+function normalize(raw) {
+  const list = Array.isArray(raw) ? raw : raw && Array.isArray(raw.stakeholders) ? raw.stakeholders : null;
+  if (!list) throw new Error('Die Datei enthält keine Stakeholder-Liste.');
+  return list.map((s) => ({
+    id: typeof s.id === 'string' && s.id ? s.id : uid(),
+    name: String(s.name ?? ''),
+    short: String(s.short ?? ''),
+    role: String(s.role ?? ''),
+    org: String(s.org ?? ''),
+    attitude: ATTITUDES.some((a) => a.value === s.attitude) ? s.attitude : 'neutral',
+    notes: String(s.notes ?? ''),
+    x: typeof s.x === 'number' ? clamp(s.x) : null,
+    y: typeof s.y === 'number' ? clamp(s.y) : null,
+  }));
+}
+
+function serialize() {
+  return JSON.stringify({
+    app: 'stakeholder-map',
+    version: 1,
+    updatedAt: new Date().toISOString(),
+    stakeholders,
+  }, null, 2) + '\n';
+}
+
+function clamp(v) {
+  return Math.min(1, Math.max(0, v));
+}
+
+// ---------- Datei-Handling ----------
+
+function setStatus(text, kind = '') {
+  const el = $('status');
+  el.textContent = text;
+  el.className = 'status' + (kind ? ' ' + kind : '');
+}
+
+function updateFileInfo() {
+  $('fileName').textContent = fileName || 'Keine Datei';
+  document.title = (dirty ? '• ' : '') + (fileName ? fileName + ' – ' : '') + 'Stakeholder-Map';
+}
+
+function markDirty() {
+  dirty = true;
+  updateFileInfo();
+  if (fileHandle) {
+    setStatus('Ungespeicherte Änderungen…', 'dirty');
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(save, 600);
+  } else {
+    setStatus(HAS_FS_API ? 'Ungespeichert – bitte „Speichern unter…“ wählen' : 'Ungespeicherte Änderungen', 'dirty');
+  }
+}
+
+async function writeToHandle() {
+  const writable = await fileHandle.createWritable();
+  await writable.write(serialize());
+  await writable.close();
+}
+
+async function save() {
+  clearTimeout(saveTimer);
+  if (!HAS_FS_API) return download();
+  if (!fileHandle) return saveAs();
+  try {
+    if ((await fileHandle.queryPermission({ mode: 'readwrite' })) !== 'granted' &&
+        (await fileHandle.requestPermission({ mode: 'readwrite' })) !== 'granted') {
+      setStatus('Keine Schreibberechtigung für die Datei', 'error');
+      return;
+    }
+    await writeToHandle();
+    dirty = false;
+    setStatus('Gespeichert um ' + new Date().toLocaleTimeString('de-DE'));
+  } catch (err) {
+    setStatus('Speichern fehlgeschlagen: ' + err.message, 'error');
+  }
+  updateFileInfo();
+}
+
+async function saveAs() {
+  if (!HAS_FS_API) return download();
+  try {
+    const handle = await window.showSaveFilePicker({ suggestedName: fileName || 'stakeholder.json', types: FILE_TYPES });
+    fileHandle = handle;
+    fileName = handle.name;
+    rememberHandle(handle);
+    await save();
+  } catch (err) {
+    if (err.name !== 'AbortError') setStatus('Speichern fehlgeschlagen: ' + err.message, 'error');
+  }
+}
+
+function download() {
+  const blob = new Blob([serialize()], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = fileName || 'stakeholder.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  fileName = a.download;
+  dirty = false;
+  setStatus('Heruntergeladen um ' + new Date().toLocaleTimeString('de-DE'));
+  updateFileInfo();
+}
+
+function confirmDiscard() {
+  return !dirty || confirm('Es gibt ungespeicherte Änderungen. Trotzdem fortfahren?');
+}
+
+function loadText(text, name, handle) {
+  let data;
+  try {
+    data = normalize(JSON.parse(text));
+  } catch (err) {
+    alert('Die Datei konnte nicht gelesen werden: ' + err.message);
+    return;
+  }
+  stakeholders = data;
+  fileHandle = handle || null;
+  fileName = name;
+  dirty = false;
+  selectedId = null;
+  setStatus(handle ? 'Geöffnet – Änderungen werden automatisch gespeichert' : 'Geöffnet');
+  updateFileInfo();
+  renderAll();
+}
+
+async function openFile() {
+  if (!confirmDiscard()) return;
+  if (!HAS_FS_API) {
+    $('fileInput').click();
+    return;
+  }
+  try {
+    const [handle] = await window.showOpenFilePicker({ types: FILE_TYPES });
+    await openHandle(handle);
+  } catch (err) {
+    if (err.name !== 'AbortError') setStatus('Öffnen fehlgeschlagen: ' + err.message, 'error');
+  }
+}
+
+async function openHandle(handle) {
+  const file = await handle.getFile();
+  loadText(await file.text(), handle.name, handle);
+  rememberHandle(handle);
+  $('reopenBanner').hidden = true;
+}
+
+function newFile() {
+  if (!confirmDiscard()) return;
+  stakeholders = [];
+  fileHandle = null;
+  fileName = null;
+  dirty = false;
+  selectedId = null;
+  setStatus('Neue Liste – noch nicht gespeichert');
+  updateFileInfo();
+  renderAll();
+}
+
+// Letzte Datei merken (nur der Datei-Verweis, nicht die Daten) – via IndexedDB.
+function idb(mode, fn) {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('stakeholder-map', 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('handles');
+    req.onerror = () => reject(req.error);
+    req.onsuccess = () => {
+      try {
+        const tx = req.result.transaction('handles', mode);
+        const r = fn(tx.objectStore('handles'));
+        tx.oncomplete = () => resolve(r && r.result);
+        tx.onerror = () => reject(tx.error);
+      } catch (err) {
+        reject(err);
+      }
+    };
+  });
+}
+
+function rememberHandle(handle) {
+  idb('readwrite', (store) => store.put(handle, 'last')).catch(() => {});
+}
+
+async function offerReopen() {
+  if (!HAS_FS_API) return;
+  let handle;
+  try {
+    handle = await idb('readonly', (store) => store.get('last'));
+  } catch {
+    return;
+  }
+  if (!handle) return;
+  $('reopenName').textContent = handle.name;
+  $('reopenBanner').hidden = false;
+  $('btnReopen').onclick = async () => {
+    try {
+      if ((await handle.requestPermission({ mode: 'readwrite' })) !== 'granted') return;
+      if (!confirmDiscard()) return;
+      await openHandle(handle);
+    } catch (err) {
+      setStatus('Datei konnte nicht geöffnet werden: ' + err.message, 'error');
+      $('reopenBanner').hidden = true;
+    }
+  };
+}
+
+// ---------- Rendering ----------
+
+function makeChip(s) {
+  const chip = document.createElement('div');
+  chip.className = 'chip' + (s.id === selectedId ? ' selected' : '');
+  chip.dataset.id = s.id;
+  chip.dataset.attitude = s.attitude;
+  const tooltip = [s.name || 'Ohne Namen', s.role, s.org].filter(Boolean).join(' · ');
+  chip.title = tooltip + (isPlaced(s) ? '\n' + quadrantOf(s) : '');
+  const dot = document.createElement('span');
+  dot.className = 'dot';
+  dot.textContent = shortOf(s);
+  const label = document.createElement('span');
+  label.className = 'label';
+  label.textContent = s.name || 'Ohne Namen';
+  chip.append(dot, label);
+  chip.addEventListener('pointerdown', startDrag);
+  return chip;
+}
+
+function renderBoard() {
+  plane.querySelectorAll('.chip').forEach((c) => c.remove());
+  pool.replaceChildren();
+
+  const unplaced = [];
+  for (const s of stakeholders) {
+    if (isPlaced(s)) {
+      const chip = makeChip(s);
+      chip.style.left = s.x * 100 + '%';
+      chip.style.top = (1 - s.y) * 100 + '%';
+      plane.appendChild(chip);
+    } else {
+      unplaced.push(s);
+    }
+  }
+  for (const s of unplaced) pool.appendChild(makeChip(s));
+  if (!unplaced.length) {
+    const p = document.createElement('div');
+    p.className = 'empty';
+    p.textContent = stakeholders.length ? 'Alle Stakeholder sind platziert.' : 'Noch keine Stakeholder – unten hinzufügen.';
+    pool.appendChild(p);
+  }
+  $('poolCount').textContent = unplaced.length ? '(' + unplaced.length + ')' : '';
+}
+
+function field(tag, s, key, attrs = {}) {
+  const el = document.createElement(tag);
+  Object.assign(el, attrs);
+  el.value = s[key];
+  el.addEventListener('input', () => {
+    s[key] = el.value;
+    renderBoard();
+    markDirty();
+  });
+  return el;
+}
+
+function renderTable() {
+  const q = $('search').value.trim().toLowerCase();
+  const visible = stakeholders.filter((s) =>
+    !q || [s.name, s.short, s.role, s.org, s.notes].some((v) => v.toLowerCase().includes(q)));
+
+  rows.replaceChildren();
+  for (const s of visible) {
+    const tr = document.createElement('tr');
+    tr.dataset.id = s.id;
+    if (s.id === selectedId) tr.className = 'selected';
+    tr.addEventListener('focusin', () => select(s.id, false));
+
+    const tdShort = document.createElement('td');
+    const shortInput = field('input', s, 'short', { placeholder: initials(s.name), maxLength: 4 });
+    tdShort.append(shortInput);
+
+    const tdName = document.createElement('td');
+    const nameInput = field('input', s, 'name', { placeholder: 'Name' });
+    nameInput.addEventListener('input', () => { shortInput.placeholder = initials(s.name); });
+    nameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.isComposing && s.name.trim()) {
+        e.preventDefault();
+        addStakeholder(s.id);
+      }
+    });
+    tdName.append(nameInput);
+
+    const tdRole = document.createElement('td');
+    tdRole.append(field('input', s, 'role', { placeholder: 'Rolle' }));
+
+    const tdOrg = document.createElement('td');
+    tdOrg.append(field('input', s, 'org', { placeholder: 'Organisation' }));
+
+    const tdAtt = document.createElement('td');
+    const sel = document.createElement('select');
+    for (const a of ATTITUDES) sel.add(new Option(a.label, a.value));
+    sel.value = s.attitude;
+    sel.addEventListener('change', () => {
+      s.attitude = sel.value;
+      renderBoard();
+      markDirty();
+    });
+    tdAtt.append(sel);
+
+    const tdQuad = document.createElement('td');
+    tdQuad.className = 'quad';
+    tdQuad.textContent = quadrantOf(s);
+
+    const tdNotes = document.createElement('td');
+    tdNotes.append(field('textarea', s, 'notes', { rows: 1, placeholder: 'Notizen, nächste Schritte…' }));
+
+    const tdAct = document.createElement('td');
+    tdAct.className = 'actions';
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'danger';
+    del.textContent = 'Löschen';
+    del.addEventListener('click', () => removeStakeholder(s.id));
+    tdAct.append(del);
+
+    tr.append(tdName, tdShort, tdRole, tdOrg, tdAtt, tdQuad, tdNotes, tdAct);
+    rows.appendChild(tr);
+  }
+
+  if (!visible.length) {
+    const tr = document.createElement('tr');
+    tr.className = 'no-rows';
+    const td = document.createElement('td');
+    td.colSpan = 8;
+    td.textContent = stakeholders.length ? 'Keine Treffer.' : 'Noch keine Stakeholder. Mit „+ Stakeholder“ anlegen oder eine Datei öffnen.';
+    tr.appendChild(td);
+    rows.appendChild(tr);
+  }
+  $('listCount').textContent = stakeholders.length ? '(' + stakeholders.length + ')' : '';
+}
+
+function renderAll() {
+  renderBoard();
+  renderTable();
+}
+
+function select(id, scroll = true) {
+  if (selectedId === id) return;
+  selectedId = id;
+  document.querySelectorAll('.chip').forEach((c) => c.classList.toggle('selected', c.dataset.id === id));
+  rows.querySelectorAll('tr').forEach((tr) => tr.classList.toggle('selected', tr.dataset.id === id));
+  if (scroll) {
+    const tr = rows.querySelector(`tr[data-id="${CSS.escape(id)}"]`);
+    if (tr) tr.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+}
+
+// Neue Zeile am Ende oder direkt nach dem Stakeholder mit afterId.
+function addStakeholder(afterId) {
+  const s = { id: uid(), name: '', short: '', role: '', org: '', attitude: 'neutral', notes: '', x: null, y: null };
+  const index = stakeholders.findIndex((x) => x.id === afterId);
+  stakeholders.splice(index === -1 ? stakeholders.length : index + 1, 0, s);
+  selectedId = s.id;
+  $('search').value = '';
+  renderAll();
+  markDirty();
+  const input = rows.querySelector(`tr[data-id="${CSS.escape(s.id)}"] input`);
+  if (input) input.focus();
+}
+
+function removeStakeholder(id) {
+  const s = byId(id);
+  if (!s || !confirm(`„${s.name || 'Ohne Namen'}“ wirklich löschen?`)) return;
+  stakeholders = stakeholders.filter((x) => x.id !== id);
+  if (selectedId === id) selectedId = null;
+  renderAll();
+  markDirty();
+}
+
+// ---------- Drag & Drop (Pointer Events: Maus, Touch und Stift) ----------
+
+function inside(rect, e) {
+  return e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
+}
+
+function startDrag(e) {
+  if (e.button !== 0) return;
+  e.preventDefault();
+  const source = e.currentTarget;
+  const id = source.dataset.id;
+  const startX = e.clientX;
+  const startY = e.clientY;
+  let ghost = null;
+
+  const onMove = (ev) => {
+    if (!ghost) {
+      if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 4) return;
+      ghost = source.cloneNode(true);
+      ghost.classList.add('ghost');
+      ghost.classList.remove('dragging');
+      document.body.appendChild(ghost);
+      source.classList.add('dragging');
+    }
+    ghost.style.left = ev.clientX + 'px';
+    ghost.style.top = ev.clientY + 'px';
+    plane.classList.toggle('over', inside(plane.getBoundingClientRect(), ev));
+    pool.classList.toggle('over', inside(pool.getBoundingClientRect(), ev));
+  };
+
+  const onEnd = (ev) => {
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onEnd);
+    window.removeEventListener('pointercancel', onEnd);
+    plane.classList.remove('over');
+    pool.classList.remove('over');
+
+    if (!ghost) {
+      select(id);
+      return;
+    }
+    ghost.remove();
+    source.classList.remove('dragging');
+    if (ev.type === 'pointercancel') return;
+
+    const s = byId(id);
+    const rect = plane.getBoundingClientRect();
+    if (inside(rect, ev)) {
+      s.x = clamp((ev.clientX - rect.left) / rect.width);
+      s.y = clamp(1 - (ev.clientY - rect.top) / rect.height);
+    } else if (inside(pool.getBoundingClientRect(), ev)) {
+      s.x = null;
+      s.y = null;
+    } else {
+      return;
+    }
+    selectedId = id;
+    renderAll();
+    markDirty();
+  };
+
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onEnd);
+  window.addEventListener('pointercancel', onEnd);
+}
+
+// ---------- Events ----------
+
+$('btnNew').addEventListener('click', newFile);
+$('btnOpen').addEventListener('click', openFile);
+$('btnSave').addEventListener('click', save);
+$('btnSaveAs').addEventListener('click', saveAs);
+$('btnAdd').addEventListener('click', () => addStakeholder());
+$('btnDismiss').addEventListener('click', () => { $('reopenBanner').hidden = true; });
+$('search').addEventListener('input', renderTable);
+$('fileInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (file) loadText(await file.text(), file.name, null);
+});
+
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+    e.preventDefault();
+    e.shiftKey ? saveAs() : save();
+  }
+});
+
+window.addEventListener('beforeunload', (e) => {
+  if (dirty) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
+
+if (!HAS_FS_API) {
+  $('fallbackBanner').hidden = false;
+  $('btnSaveAs').hidden = true;
+  $('btnSave').textContent = 'Speichern (Download)';
+}
+
+renderAll();
+offerReopen();
+</script>
+</body>
+</html>
