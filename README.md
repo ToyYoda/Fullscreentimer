@@ -16,7 +16,9 @@ Drag-and-drop-Tool für Stakeholder-Management als **eine einzige HTML-Datei**: 
 Alle Daten liegen in einer JSON-Datei, die du selbst auswählst (z. B. `stakeholder.json`).
 
 - **Chrome / Edge:** Die Datei wird direkt geschrieben. Nach dem ersten Speichern wird jede Änderung automatisch gesichert. Beim nächsten Start bietet die Seite an, die zuletzt verwendete Datei wieder zu öffnen (gemerkt wird nur der Verweis auf die Datei, nicht die Daten).
-- **Firefox / Safari:** Diese Browser können keine Dateien überschreiben. „Datei öffnen…“ lädt die Datei, „Speichern (Download)“ lädt die aktuelle Fassung herunter.
+- **Firefox / Safari:** Diese Browser können keine Dateien überschreiben. „Öffnen…“ lädt die Datei, „Speichern (Download)“ lädt die aktuelle Fassung herunter.
+
+- **Handy / Tablet:** Die Seite passt sich an kleine Bildschirme an: Die Liste wird zu Karten, Stakeholder lassen sich mit dem Finger in die Matrix ziehen. Mobile Browser nutzen in der Regel den Download-Weg wie Firefox/Safari.
 
 Tastenkürzel: `Strg/Cmd + S` speichert, `Strg/Cmd + Umschalt + S` heißt „Speichern unter…“.
 

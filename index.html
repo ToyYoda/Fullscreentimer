@@ -48,6 +48,7 @@
     position: sticky; top: 0; z-index: 10;
   }
   header h1 { font-size: 18px; margin: 0 12px 0 0; }
+  .header-actions { display: flex; flex-wrap: wrap; gap: 8px; }
   .file-info { display: flex; flex-direction: column; margin-right: auto; min-width: 0; }
   .file-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .status { font-size: 12px; color: var(--muted); }
@@ -112,6 +113,8 @@
   .plane .chip .label {
     background: var(--panel); padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border);
   }
+  /* Rechts in der Matrix: Name links vom Kreis, damit er nicht abgeschnitten wird */
+  .plane .chip.flip { flex-direction: row-reverse; transform: translate(calc(-100% + 15px), -50%); }
   .chip.selected .dot { outline: 3px solid var(--accent); outline-offset: 1px; }
   .chip.selected { z-index: 3; }
   .chip.dragging { opacity: .3; }
@@ -155,6 +158,54 @@
   .col-notes { min-width: 220px; }
   .col-short { width: 80px; }
   .no-rows td { color: var(--muted); text-align: center; padding: 20px; }
+
+  /* Tablet & Handy */
+  @media (max-width: 900px) {
+    .pool { flex-direction: row; flex-wrap: wrap; min-height: 56px; }
+    .board .hint { display: none; }
+  }
+  @media (max-width: 700px) {
+    header { padding: 10px 12px; gap: 8px; }
+    header h1 { font-size: 16px; }
+    .file-info { flex-basis: calc(100% - 160px); }
+    .header-actions { flex-wrap: nowrap; gap: 6px; width: 100%; }
+    .header-actions button { flex: 1 1 0; padding: 8px 4px; font-size: 13px; }
+    .banner { margin: 10px 12px 0; font-size: 13px; }
+    main { padding: 12px 12px 32px; gap: 12px; }
+    .card { padding: 10px; }
+    .matrix-wrap { grid-template-columns: 20px 1fr; grid-template-rows: 1fr 22px; }
+    .plane { aspect-ratio: 1 / 1; max-height: none; }
+    .quadrant { padding: 6px; font-size: 0; }
+    .quadrant strong { font-size: 11px; }
+    .chip { max-width: 120px; }
+    .plane .chip .label { font-size: 11px; padding: 0 4px; }
+    .chip .dot { min-width: 28px; height: 28px; font-size: 10px; }
+    .plane .chip, .chip.ghost { transform: translate(-14px, -50%); }
+    .plane .chip.flip { transform: translate(calc(-100% + 14px), -50%); }
+    textarea { min-height: 64px; }
+
+    /* Liste als Karten */
+    .table-head input[type="search"] { width: auto; flex: 1 1 140px; }
+    table, tbody, tr, td { display: block; width: 100%; }
+    thead { display: none; }
+    tr {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px;
+      border: 1px solid var(--border); border-radius: 8px; padding: 8px; margin-bottom: 10px;
+    }
+    tr.selected { border-color: var(--accent); }
+    tr.selected td { background: transparent; }
+    td { border: none; padding: 0; }
+    td[data-label]:not([data-label=""])::before {
+      content: attr(data-label); display: block; font-size: 11px; color: var(--muted); margin: 0 0 2px 2px;
+    }
+    td.c-name { grid-column: 1; }
+    td.c-notes, td.c-act { grid-column: 1 / -1; }
+    td.c-act { width: 100%; text-align: right; }
+    .no-rows { display: block; border: none; }
+    input, select, textarea { font-size: 16px; border-color: var(--border); padding: 8px; }
+    td.quad { font-size: 14px; padding: 0 2px; white-space: normal; }
+    button { min-height: 38px; }
+  }
   .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 </style>
 </head>
@@ -165,10 +216,12 @@
     <span class="file-name" id="fileName">Keine Datei</span>
     <span class="status" id="status">Noch nicht gespeichert</span>
   </div>
-  <button id="btnNew" type="button">Neu</button>
-  <button id="btnOpen" type="button">Datei öffnen…</button>
-  <button id="btnSave" type="button" class="primary">Speichern</button>
-  <button id="btnSaveAs" type="button">Speichern unter…</button>
+  <div class="header-actions">
+    <button id="btnNew" type="button">Neu</button>
+    <button id="btnOpen" type="button">Öffnen…</button>
+    <button id="btnSave" type="button" class="primary">Speichern</button>
+    <button id="btnSaveAs" type="button">Speichern unter…</button>
+  </div>
   <input id="fileInput" type="file" accept=".json,application/json" class="visually-hidden">
 </header>
 
@@ -179,7 +232,7 @@
 </div>
 <div class="banner" id="fallbackBanner" hidden>
   <span>Dieser Browser kann Dateien nicht direkt überschreiben. „Speichern“ lädt die Datei herunter –
-    ersetze damit deine bisherige Datei. Für automatisches Speichern Chrome oder Edge verwenden.</span>
+    ersetze damit deine bisherige Datei. Für automatisches Speichern am Computer Chrome oder Edge verwenden.</span>
 </div>
 
 <main>
@@ -533,6 +586,7 @@ function renderBoard() {
       const chip = makeChip(s);
       chip.style.left = s.x * 100 + '%';
       chip.style.top = (1 - s.y) * 100 + '%';
+      chip.classList.toggle('flip', s.x > 0.6);
       plane.appendChild(chip);
     } else {
       unplaced.push(s);
@@ -560,6 +614,13 @@ function field(tag, s, key, attrs = {}) {
   return el;
 }
 
+function cell(cls, label) {
+  const td = document.createElement('td');
+  td.className = cls;
+  td.dataset.label = label;
+  return td;
+}
+
 function renderTable() {
   const q = $('search').value.trim().toLowerCase();
   const visible = stakeholders.filter((s) =>
@@ -572,12 +633,12 @@ function renderTable() {
     if (s.id === selectedId) tr.className = 'selected';
     tr.addEventListener('focusin', () => select(s.id, false));
 
-    const tdShort = document.createElement('td');
+    const tdShort = cell('c-short', 'Kürzel');
     const shortInput = field('input', s, 'short', { placeholder: initials(s.name), maxLength: 4 });
     tdShort.append(shortInput);
 
-    const tdName = document.createElement('td');
-    const nameInput = field('input', s, 'name', { placeholder: 'Name' });
+    const tdName = cell('c-name', 'Name');
+    const nameInput = field('input', s, 'name', { placeholder: 'Name', enterKeyHint: 'next' });
     nameInput.addEventListener('input', () => { shortInput.placeholder = initials(s.name); });
     nameInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.isComposing && s.name.trim()) {
@@ -587,13 +648,13 @@ function renderTable() {
     });
     tdName.append(nameInput);
 
-    const tdRole = document.createElement('td');
+    const tdRole = cell('c-role', 'Rolle');
     tdRole.append(field('input', s, 'role', { placeholder: 'Rolle' }));
 
-    const tdOrg = document.createElement('td');
+    const tdOrg = cell('c-org', 'Organisation');
     tdOrg.append(field('input', s, 'org', { placeholder: 'Organisation' }));
 
-    const tdAtt = document.createElement('td');
+    const tdAtt = cell('c-att', 'Haltung');
     const sel = document.createElement('select');
     for (const a of ATTITUDES) sel.add(new Option(a.label, a.value));
     sel.value = s.attitude;
@@ -604,15 +665,13 @@ function renderTable() {
     });
     tdAtt.append(sel);
 
-    const tdQuad = document.createElement('td');
-    tdQuad.className = 'quad';
+    const tdQuad = cell('c-quad quad', 'Quadrant');
     tdQuad.textContent = quadrantOf(s);
 
-    const tdNotes = document.createElement('td');
+    const tdNotes = cell('c-notes', 'Notizen / Maßnahmen');
     tdNotes.append(field('textarea', s, 'notes', { rows: 1, placeholder: 'Notizen, nächste Schritte…' }));
 
-    const tdAct = document.createElement('td');
-    tdAct.className = 'actions';
+    const tdAct = cell('c-act actions', '');
     const del = document.createElement('button');
     del.type = 'button';
     del.className = 'danger';
@@ -687,6 +746,7 @@ function startDrag(e) {
   const id = source.dataset.id;
   const startX = e.clientX;
   const startY = e.clientY;
+  const liftY = e.pointerType === 'touch' ? -45 : 0;
   let ghost = null;
 
   const onMove = (ev) => {
@@ -698,10 +758,11 @@ function startDrag(e) {
       document.body.appendChild(ghost);
       source.classList.add('dragging');
     }
-    ghost.style.left = ev.clientX + 'px';
-    ghost.style.top = ev.clientY + 'px';
-    plane.classList.toggle('over', inside(plane.getBoundingClientRect(), ev));
-    pool.classList.toggle('over', inside(pool.getBoundingClientRect(), ev));
+    const pt = { clientX: ev.clientX, clientY: ev.clientY + liftY };
+    ghost.style.left = pt.clientX + 'px';
+    ghost.style.top = pt.clientY + 'px';
+    plane.classList.toggle('over', inside(plane.getBoundingClientRect(), pt));
+    pool.classList.toggle('over', inside(pool.getBoundingClientRect(), pt));
   };
 
   const onEnd = (ev) => {
@@ -719,12 +780,13 @@ function startDrag(e) {
     source.classList.remove('dragging');
     if (ev.type === 'pointercancel') return;
 
+    const pt = { clientX: ev.clientX, clientY: ev.clientY + liftY };
     const s = byId(id);
     const rect = plane.getBoundingClientRect();
-    if (inside(rect, ev)) {
-      s.x = clamp((ev.clientX - rect.left) / rect.width);
-      s.y = clamp(1 - (ev.clientY - rect.top) / rect.height);
-    } else if (inside(pool.getBoundingClientRect(), ev)) {
+    if (inside(rect, pt)) {
+      s.x = clamp((pt.clientX - rect.left) / rect.width);
+      s.y = clamp(1 - (pt.clientY - rect.top) / rect.height);
+    } else if (inside(pool.getBoundingClientRect(), pt)) {
       s.x = null;
       s.y = null;
     } else {
