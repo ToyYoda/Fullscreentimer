@@ -99,7 +99,7 @@
     touch-action: none; max-width: 160px;
   }
   .chip .dot {
-    flex: none; width: 30px; height: 30px; border-radius: 50%;
+    flex: none; min-width: 30px; height: 30px; padding: 0 5px; border-radius: 15px;
     display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 11px;
     background: var(--neu); border: 2px solid var(--panel); box-shadow: 0 1px 3px rgba(0,0,0,.3);
   }
@@ -153,6 +153,7 @@
   td.actions { width: 1%; white-space: nowrap; }
   .col-name { min-width: 160px; }
   .col-notes { min-width: 220px; }
+  .col-short { width: 80px; }
   .no-rows td { color: var(--muted); text-align: center; padding: 20px; }
   .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 </style>
@@ -221,6 +222,7 @@
         <thead>
           <tr>
             <th class="col-name">Name</th>
+            <th class="col-short" title="Leer lassen, um die Initialen des Namens zu verwenden">Kürzel</th>
             <th>Rolle</th>
             <th>Organisation</th>
             <th>Haltung</th>
@@ -288,12 +290,18 @@ function initials(name) {
   return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
 }
 
+// Eigenes Kürzel, sonst die Initialen des Namens.
+function shortOf(s) {
+  return s.short.trim() || initials(s.name);
+}
+
 function normalize(raw) {
   const list = Array.isArray(raw) ? raw : raw && Array.isArray(raw.stakeholders) ? raw.stakeholders : null;
   if (!list) throw new Error('Die Datei enthält keine Stakeholder-Liste.');
   return list.map((s) => ({
     id: typeof s.id === 'string' && s.id ? s.id : uid(),
     name: String(s.name ?? ''),
+    short: String(s.short ?? ''),
     role: String(s.role ?? ''),
     org: String(s.org ?? ''),
     attitude: ATTITUDES.some((a) => a.value === s.attitude) ? s.attitude : 'neutral',
@@ -506,7 +514,7 @@ function makeChip(s) {
   chip.title = tooltip + (isPlaced(s) ? '\n' + quadrantOf(s) : '');
   const dot = document.createElement('span');
   dot.className = 'dot';
-  dot.textContent = initials(s.name);
+  dot.textContent = shortOf(s);
   const label = document.createElement('span');
   label.className = 'label';
   label.textContent = s.name || 'Ohne Namen';
@@ -555,7 +563,7 @@ function field(tag, s, key, attrs = {}) {
 function renderTable() {
   const q = $('search').value.trim().toLowerCase();
   const visible = stakeholders.filter((s) =>
-    !q || [s.name, s.role, s.org, s.notes].some((v) => v.toLowerCase().includes(q)));
+    !q || [s.name, s.short, s.role, s.org, s.notes].some((v) => v.toLowerCase().includes(q)));
 
   rows.replaceChildren();
   for (const s of visible) {
@@ -564,8 +572,20 @@ function renderTable() {
     if (s.id === selectedId) tr.className = 'selected';
     tr.addEventListener('focusin', () => select(s.id, false));
 
+    const tdShort = document.createElement('td');
+    const shortInput = field('input', s, 'short', { placeholder: initials(s.name), maxLength: 4 });
+    tdShort.append(shortInput);
+
     const tdName = document.createElement('td');
-    tdName.append(field('input', s, 'name', { placeholder: 'Name' }));
+    const nameInput = field('input', s, 'name', { placeholder: 'Name' });
+    nameInput.addEventListener('input', () => { shortInput.placeholder = initials(s.name); });
+    nameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.isComposing && s.name.trim()) {
+        e.preventDefault();
+        addStakeholder(s.id);
+      }
+    });
+    tdName.append(nameInput);
 
     const tdRole = document.createElement('td');
     tdRole.append(field('input', s, 'role', { placeholder: 'Rolle' }));
@@ -600,7 +620,7 @@ function renderTable() {
     del.addEventListener('click', () => removeStakeholder(s.id));
     tdAct.append(del);
 
-    tr.append(tdName, tdRole, tdOrg, tdAtt, tdQuad, tdNotes, tdAct);
+    tr.append(tdName, tdShort, tdRole, tdOrg, tdAtt, tdQuad, tdNotes, tdAct);
     rows.appendChild(tr);
   }
 
@@ -608,7 +628,7 @@ function renderTable() {
     const tr = document.createElement('tr');
     tr.className = 'no-rows';
     const td = document.createElement('td');
-    td.colSpan = 7;
+    td.colSpan = 8;
     td.textContent = stakeholders.length ? 'Keine Treffer.' : 'Noch keine Stakeholder. Mit „+ Stakeholder“ anlegen oder eine Datei öffnen.';
     tr.appendChild(td);
     rows.appendChild(tr);
@@ -632,9 +652,11 @@ function select(id, scroll = true) {
   }
 }
 
-function addStakeholder() {
-  const s = { id: uid(), name: '', role: '', org: '', attitude: 'neutral', notes: '', x: null, y: null };
-  stakeholders.push(s);
+// Neue Zeile am Ende oder direkt nach dem Stakeholder mit afterId.
+function addStakeholder(afterId) {
+  const s = { id: uid(), name: '', short: '', role: '', org: '', attitude: 'neutral', notes: '', x: null, y: null };
+  const index = stakeholders.findIndex((x) => x.id === afterId);
+  stakeholders.splice(index === -1 ? stakeholders.length : index + 1, 0, s);
   selectedId = s.id;
   $('search').value = '';
   renderAll();
@@ -724,7 +746,7 @@ $('btnNew').addEventListener('click', newFile);
 $('btnOpen').addEventListener('click', openFile);
 $('btnSave').addEventListener('click', save);
 $('btnSaveAs').addEventListener('click', saveAs);
-$('btnAdd').addEventListener('click', addStakeholder);
+$('btnAdd').addEventListener('click', () => addStakeholder());
 $('btnDismiss').addEventListener('click', () => { $('reopenBanner').hidden = true; });
 $('search').addEventListener('input', renderTable);
 $('fileInput').addEventListener('change', async (e) => {

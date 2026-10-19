@@ -5,7 +5,9 @@ Drag-and-drop-Tool für Stakeholder-Management als **eine einzige HTML-Datei**: 
 ## Nutzung
 
 1. `index.html` im Browser öffnen (Doppelklick genügt).
-2. In der **Stakeholderliste** Stakeholder mit „+ Stakeholder“ anlegen und direkt in der Tabelle bearbeiten: Name, Rolle, Organisation, Haltung, Notizen.
+2. In der **Stakeholderliste** Stakeholder mit „+ Stakeholder“ anlegen und direkt in der Tabelle bearbeiten: Name, Kürzel, Rolle, Organisation, Haltung, Notizen.
+   - `Enter` im Namensfeld legt direkt darunter eine neue Zeile an und springt hinein.
+   - Das **Kürzel** steht im Kreis in der Matrix. Bleibt es leer, werden die Initialen des Namens verwendet (z. B. „AS“ für Anna Schmidt). Bis zu 4 Zeichen.
 3. Stakeholder aus „Nicht platziert“ per Drag & Drop in die **Einfluss-/Interesse-Matrix** ziehen und dort frei verschieben. Wer zurück in die Ablage gezogen wird, ist nicht mehr platziert.
 4. **Speichern unter…** wählt die JSON-Datei, in der alle Daten liegen.
 
@@ -29,6 +31,7 @@ Tastenkürzel: `Strg/Cmd + S` speichert, `Strg/Cmd + Umschalt + S` heißt „Spe
     {
       "id": "s-…",
       "name": "Anna Schmidt",
+      "short": "",
       "role": "Bereichsleitung",
       "org": "Vertrieb",
       "attitude": "pro",
@@ -40,6 +43,7 @@ Tastenkürzel: `Strg/Cmd + S` speichert, `Strg/Cmd + Umschalt + S` heißt „Spe
 }
 ```
 
+- `short`: eigenes Kürzel; leer heißt Initialen des Namens
 - `attitude`: `pro` (Unterstützer), `neutral` oder `con` (Kritiker)
 - `x`: Interesse von 0 (niedrig) bis 1 (hoch), `y`: Einfluss von 0 bis 1; `null` heißt nicht platziert
 - Quadranten: Eng einbinden (hoher Einfluss, hohes Interesse), Zufriedenstellen (hoher Einfluss, geringes Interesse), Informieren (geringer Einfluss, hohes Interesse), Beobachten (geringer Einfluss, geringes Interesse)
