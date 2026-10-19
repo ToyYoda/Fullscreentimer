@@ -67,6 +67,8 @@
     display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
   }
   .banner[hidden] { display: none; }
+  .banner > span { flex: 1 1 200px; }
+  .banner-close { padding: 2px 10px; font-size: 18px; line-height: 1; }
   main { padding: 16px 20px 40px; display: grid; gap: 16px; }
   .board { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 16px; align-items: start; }
   @media (max-width: 900px) { .board { grid-template-columns: 1fr; } }
@@ -118,6 +120,18 @@
   .chip.selected .dot { outline: 3px solid var(--accent); outline-offset: 1px; }
   .chip.selected { z-index: 3; }
   .chip.dragging { opacity: .3; }
+  .chip.armed .dot { animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 7px rgba(47, 111, 222, .35); } }
+  body.placing .plane { cursor: crosshair; outline: 3px dashed var(--accent); outline-offset: 2px; }
+  .place-bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+    background: var(--panel); border-top: 2px solid var(--accent); box-shadow: 0 -2px 10px rgba(0,0,0,.15);
+  }
+  .place-bar[hidden] { display: none; }
+  .place-bar span { flex: 1 1 200px; }
+  body.placing main { padding-bottom: 90px; }
   .chip.ghost {
     position: fixed; z-index: 1000; pointer-events: none; cursor: grabbing;
     transform: translate(-15px, -50%);
@@ -165,11 +179,17 @@
     .board .hint { display: none; }
   }
   @media (max-width: 700px) {
-    header { padding: 10px 12px; gap: 8px; }
+    /* Ablage über der Matrix, Kopfzeile scrollt mit: beides passt zusammen auf den Bildschirm */
+    header { position: static; padding: 10px 12px; gap: 8px; }
+    .board > .card:last-child { order: -1; }
+    .board .card h2 { margin-bottom: 6px; }
+    .pool { min-height: 44px; padding: 6px; gap: 6px; }
+    .matrix-wrap { max-width: max(260px, calc(100svh - 260px)); margin: 0 auto; }
     header h1 { font-size: 16px; }
     .file-info { flex-basis: calc(100% - 160px); }
     .header-actions { flex-wrap: nowrap; gap: 6px; width: 100%; }
     .header-actions button { flex: 1 1 0; padding: 8px 4px; font-size: 13px; }
+    .desktop-only { display: none; }
     .banner { margin: 10px 12px 0; font-size: 13px; }
     main { padding: 12px 12px 32px; gap: 12px; }
     .card { padding: 10px; }
@@ -241,6 +261,7 @@
 <div class="banner" id="fallbackBanner" hidden>
   <span>Dieser Browser kann Dateien nicht direkt überschreiben. „Speichern“ lädt die Datei herunter –
     ersetze damit deine bisherige Datei. Für automatisches Speichern am Computer Chrome oder Edge verwenden.</span>
+  <button id="btnHideFallback" type="button" class="banner-close" aria-label="Hinweis ausblenden">×</button>
 </div>
 
 <main>
@@ -267,8 +288,8 @@
     <div class="card">
       <h2>Nicht platziert <span class="count" id="poolCount"></span></h2>
       <div class="pool" id="pool"></div>
-      <p class="hint">Stakeholder in die Matrix ziehen. Zurück hierher ziehen, um sie aus der Matrix zu entfernen.
-        Klick auf einen Stakeholder markiert die Zeile in der Liste.</p>
+      <p class="hint">Stakeholder in die Matrix ziehen – oder antippen und dann auf die gewünschte Stelle in der Matrix tippen.
+        Zurück hierher ziehen bzw. tippen, um sie aus der Matrix zu entfernen.</p>
     </div>
   </section>
 
@@ -298,6 +319,12 @@
   </section>
 </main>
 
+<div class="place-bar" id="placeBar" hidden>
+  <span id="placeText"></span>
+  <button id="btnUnplace" type="button">Aus Matrix entfernen</button>
+  <button id="btnPlaceDone" type="button">Abbrechen</button>
+</div>
+
 <dialog id="askDialog">
   <p id="askText"></p>
   <div class="dialog-actions">
@@ -323,6 +350,7 @@ let fileName = null;        // Anzeigename bzw. Name für den Download
 let dirty = false;
 let saveTimer = null;
 let selectedId = null;
+let armedId = null;         // Stakeholder, der per Tippen platziert wird
 
 const $ = (id) => document.getElementById(id);
 const plane = $('plane');
@@ -593,7 +621,7 @@ async function offerReopen() {
 
 function makeChip(s) {
   const chip = document.createElement('div');
-  chip.className = 'chip' + (s.id === selectedId ? ' selected' : '');
+  chip.className = 'chip' + (s.id === selectedId ? ' selected' : '') + (s.id === armedId ? ' armed' : '');
   chip.dataset.id = s.id;
   chip.dataset.attitude = s.attitude;
   const tooltip = [s.name || 'Ohne Namen', s.role, s.org].filter(Boolean).join(' · ');
@@ -610,6 +638,7 @@ function makeChip(s) {
 }
 
 function renderBoard() {
+  if (armedId && !byId(armedId)) disarm();
   plane.querySelectorAll('.chip').forEach((c) => c.remove());
   pool.replaceChildren();
 
@@ -768,6 +797,46 @@ async function removeStakeholder(id) {
 
 // ---------- Drag & Drop (Pointer Events: Maus, Touch und Stift) ----------
 
+// ---------- Platzieren per Tippen (ohne Ziehen, z. B. auf dem Handy) ----------
+
+function arm(id) {
+  armedId = id;
+  const s = byId(id);
+  $('placeText').textContent = `„${s.name || 'Ohne Namen'}“: in die Matrix tippen, um zu platzieren.`;
+  $('btnUnplace').hidden = !isPlaced(s);
+  $('placeBar').hidden = false;
+  document.body.classList.add('placing');
+  document.querySelectorAll('.chip').forEach((c) => c.classList.toggle('armed', c.dataset.id === id));
+}
+
+function disarm() {
+  armedId = null;
+  $('placeBar').hidden = true;
+  document.body.classList.remove('placing');
+  document.querySelectorAll('.chip.armed').forEach((c) => c.classList.remove('armed'));
+}
+
+function placeArmed(x, y) {
+  const s = byId(armedId);
+  disarm();
+  if (!s) return;
+  s.x = x;
+  s.y = y;
+  selectedId = s.id;
+  renderAll();
+  markDirty();
+}
+
+plane.addEventListener('click', (e) => {
+  if (!armedId || e.target.closest('.chip')) return;
+  const rect = plane.getBoundingClientRect();
+  placeArmed(clamp((e.clientX - rect.left) / rect.width), clamp(1 - (e.clientY - rect.top) / rect.height));
+});
+
+pool.addEventListener('click', (e) => {
+  if (armedId && !e.target.closest('.chip')) placeArmed(null, null);
+});
+
 function inside(rect, e) {
   return e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
 }
@@ -781,6 +850,7 @@ function startDrag(e) {
   const startY = e.clientY;
   const liftY = e.pointerType === 'touch' ? -45 : 0;
   let ghost = null;
+  if (armedId && armedId !== id) disarm();
 
   const onMove = (ev) => {
     if (!ghost) {
@@ -807,6 +877,7 @@ function startDrag(e) {
 
     if (!ghost) {
       select(id);
+      armedId === id ? disarm() : arm(id);
       return;
     }
     ghost.remove();
@@ -844,6 +915,8 @@ $('btnSaveAs').addEventListener('click', saveAs);
 $('btnAdd').addEventListener('click', () => addStakeholder());
 $('askOk').addEventListener('click', () => $('askDialog').close('ok'));
 $('askCancel').addEventListener('click', () => $('askDialog').close('cancel'));
+$('btnPlaceDone').addEventListener('click', disarm);
+$('btnUnplace').addEventListener('click', () => placeArmed(null, null));
 $('btnDismiss').addEventListener('click', () => { $('reopenBanner').hidden = true; });
 $('search').addEventListener('input', renderTable);
 $('fileInput').addEventListener('change', async (e) => {
@@ -853,6 +926,7 @@ $('fileInput').addEventListener('change', async (e) => {
 });
 
 document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && armedId && !$('askDialog').open) disarm();
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
     e.preventDefault();
     e.shiftKey ? saveAs() : save();
@@ -866,11 +940,20 @@ window.addEventListener('beforeunload', (e) => {
   }
 });
 
+const HIDE_FALLBACK_KEY = 'stakeholder-map.hideFallbackHint';
+
 if (!HAS_FS_API) {
-  $('fallbackBanner').hidden = false;
+  let hidden = false;
+  try { hidden = localStorage.getItem(HIDE_FALLBACK_KEY) === '1'; } catch {}
+  $('fallbackBanner').hidden = hidden;
   $('btnSaveAs').hidden = true;
-  $('btnSave').textContent = 'Speichern (Download)';
+  $('btnSave').innerHTML = 'Speichern<span class="desktop-only"> (Download)</span>';
 }
+
+$('btnHideFallback').addEventListener('click', () => {
+  $('fallbackBanner').hidden = true;
+  try { localStorage.setItem(HIDE_FALLBACK_KEY, '1'); } catch {}
+});
 
 renderAll();
 offerReopen();

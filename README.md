@@ -9,6 +9,7 @@ Drag-and-drop-Tool für Stakeholder-Management als **eine einzige HTML-Datei**: 
    - `Enter` im Namensfeld legt direkt darunter eine neue Zeile an und springt hinein.
    - Das **Kürzel** steht im Kreis in der Matrix. Bleibt es leer, werden die Initialen des Namens verwendet (z. B. „AS“ für Anna Schmidt). Bis zu 4 Zeichen.
 3. Stakeholder aus „Nicht platziert“ per Drag & Drop in die **Einfluss-/Interesse-Matrix** ziehen und dort frei verschieben. Wer zurück in die Ablage gezogen wird, ist nicht mehr platziert.
+   - Ohne Ziehen (praktisch auf dem Handy): Stakeholder antippen, dann auf die gewünschte Stelle in der Matrix tippen. Dazwischen kann gescrollt werden. Die Leiste am unteren Rand zeigt, wer gerade platziert wird; „Aus Matrix entfernen“ legt ihn zurück in die Ablage.
 4. **Speichern unter…** wählt die JSON-Datei, in der alle Daten liegen.
 
 ## Datenhaltung
