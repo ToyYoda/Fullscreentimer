@@ -1,0 +1,45 @@
+# Stakeholder-Map
+
+Drag-and-drop-Tool für Stakeholder-Management als **eine einzige HTML-Datei**: kein Server, keine Datenbank, keine Installation.
+
+## Nutzung
+
+1. `index.html` im Browser öffnen (Doppelklick genügt).
+2. In der **Stakeholderliste** Stakeholder mit „+ Stakeholder“ anlegen und direkt in der Tabelle bearbeiten: Name, Rolle, Organisation, Haltung, Notizen.
+3. Stakeholder aus „Nicht platziert“ per Drag & Drop in die **Einfluss-/Interesse-Matrix** ziehen und dort frei verschieben. Wer zurück in die Ablage gezogen wird, ist nicht mehr platziert.
+4. **Speichern unter…** wählt die JSON-Datei, in der alle Daten liegen.
+
+## Datenhaltung
+
+Alle Daten liegen in einer JSON-Datei, die du selbst auswählst (z. B. `stakeholder.json`).
+
+- **Chrome / Edge:** Die Datei wird direkt geschrieben. Nach dem ersten Speichern wird jede Änderung automatisch gesichert. Beim nächsten Start bietet die Seite an, die zuletzt verwendete Datei wieder zu öffnen (gemerkt wird nur der Verweis auf die Datei, nicht die Daten).
+- **Firefox / Safari:** Diese Browser können keine Dateien überschreiben. „Datei öffnen…“ lädt die Datei, „Speichern (Download)“ lädt die aktuelle Fassung herunter.
+
+Tastenkürzel: `Strg/Cmd + S` speichert, `Strg/Cmd + Umschalt + S` heißt „Speichern unter…“.
+
+### Dateiformat
+
+```json
+{
+  "app": "stakeholder-map",
+  "version": 1,
+  "updatedAt": "2026-10-19T12:00:00.000Z",
+  "stakeholders": [
+    {
+      "id": "s-…",
+      "name": "Anna Schmidt",
+      "role": "Bereichsleitung",
+      "org": "Vertrieb",
+      "attitude": "pro",
+      "notes": "Monatliches Update",
+      "x": 0.8,
+      "y": 0.75
+    }
+  ]
+}
+```
+
+- `attitude`: `pro` (Unterstützer), `neutral` oder `con` (Kritiker)
+- `x`: Interesse von 0 (niedrig) bis 1 (hoch), `y`: Einfluss von 0 bis 1; `null` heißt nicht platziert
+- Quadranten: Eng einbinden (hoher Einfluss, hohes Interesse), Zufriedenstellen (hoher Einfluss, geringes Interesse), Informieren (geringer Einfluss, hohes Interesse), Beobachten (geringer Einfluss, geringes Interesse)
