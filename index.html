@@ -206,6 +206,14 @@
     td.quad { font-size: 14px; padding: 0 2px; white-space: normal; }
     button { min-height: 38px; }
   }
+  dialog {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px;
+    background: var(--panel); color: var(--text); width: min(380px, calc(100vw - 32px));
+  }
+  #askOk.destructive { background: var(--con); border-color: var(--con); }
+  dialog::backdrop { background: rgba(0, 0, 0, .4); }
+  dialog p { margin: 0 0 16px; }
+  .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
   .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 </style>
 </head>
@@ -289,6 +297,14 @@
     </div>
   </section>
 </main>
+
+<dialog id="askDialog">
+  <p id="askText"></p>
+  <div class="dialog-actions">
+    <button id="askCancel" type="button">Abbrechen</button>
+    <button id="askOk" type="button" class="primary">OK</button>
+  </div>
+</dialog>
 
 <script>
 'use strict';
@@ -455,8 +471,25 @@ function download() {
   updateFileInfo();
 }
 
-function confirmDiscard() {
-  return !dirty || confirm('Es gibt ungespeicherte Änderungen. Trotzdem fortfahren?');
+// Eigener Dialog statt confirm()/alert(): Die Browser-Dialoge werden in
+// eingebetteten Vorschauen (sandboxed iframes) stillschweigend blockiert.
+function ask(message, okLabel = 'OK', cancelLabel = 'Abbrechen', destructive = false) {
+  const dlg = $('askDialog');
+  $('askText').textContent = message;
+  $('askOk').textContent = okLabel;
+  $('askOk').classList.toggle('destructive', destructive);
+  $('askCancel').textContent = cancelLabel || '';
+  $('askCancel').hidden = !cancelLabel;
+  dlg.returnValue = '';
+  dlg.showModal();
+  $('askOk').focus();
+  return new Promise((resolve) => {
+    dlg.addEventListener('close', () => resolve(dlg.returnValue === 'ok'), { once: true });
+  });
+}
+
+async function confirmDiscard() {
+  return !dirty || ask('Es gibt ungespeicherte Änderungen. Trotzdem fortfahren?', 'Fortfahren');
 }
 
 function loadText(text, name, handle) {
@@ -464,7 +497,7 @@ function loadText(text, name, handle) {
   try {
     data = normalize(JSON.parse(text));
   } catch (err) {
-    alert('Die Datei konnte nicht gelesen werden: ' + err.message);
+    ask('Die Datei konnte nicht gelesen werden: ' + err.message, 'OK', null);
     return;
   }
   stakeholders = data;
@@ -478,7 +511,7 @@ function loadText(text, name, handle) {
 }
 
 async function openFile() {
-  if (!confirmDiscard()) return;
+  if (!(await confirmDiscard())) return;
   if (!HAS_FS_API) {
     $('fileInput').click();
     return;
@@ -498,8 +531,8 @@ async function openHandle(handle) {
   $('reopenBanner').hidden = true;
 }
 
-function newFile() {
-  if (!confirmDiscard()) return;
+async function newFile() {
+  if (!(await confirmDiscard())) return;
   stakeholders = [];
   fileHandle = null;
   fileName = null;
@@ -547,7 +580,7 @@ async function offerReopen() {
   $('btnReopen').onclick = async () => {
     try {
       if ((await handle.requestPermission({ mode: 'readwrite' })) !== 'granted') return;
-      if (!confirmDiscard()) return;
+      if (!(await confirmDiscard())) return;
       await openHandle(handle);
     } catch (err) {
       setStatus('Datei konnte nicht geöffnet werden: ' + err.message, 'error');
@@ -724,9 +757,9 @@ function addStakeholder(afterId) {
   if (input) input.focus();
 }
 
-function removeStakeholder(id) {
+async function removeStakeholder(id) {
   const s = byId(id);
-  if (!s || !confirm(`„${s.name || 'Ohne Namen'}“ wirklich löschen?`)) return;
+  if (!s || !(await ask(`„${s.name || 'Ohne Namen'}“ wirklich löschen?`, 'Löschen', 'Abbrechen', true))) return;
   stakeholders = stakeholders.filter((x) => x.id !== id);
   if (selectedId === id) selectedId = null;
   renderAll();
@@ -809,6 +842,8 @@ $('btnOpen').addEventListener('click', openFile);
 $('btnSave').addEventListener('click', save);
 $('btnSaveAs').addEventListener('click', saveAs);
 $('btnAdd').addEventListener('click', () => addStakeholder());
+$('askOk').addEventListener('click', () => $('askDialog').close('ok'));
+$('askCancel').addEventListener('click', () => $('askDialog').close('cancel'));
 $('btnDismiss').addEventListener('click', () => { $('reopenBanner').hidden = true; });
 $('search').addEventListener('input', renderTable);
 $('fileInput').addEventListener('change', async (e) => {
