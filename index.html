@@ -3,36 +3,45 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Stakeholder-Map</title>
+<title>Stakeholder-Map · SEFE</title>
 <style>
+  /* SEFE-Farben, abgelesen von sefe.eu (Screenshot). Bei Bedarf durch die Werte aus dem SEFE-Styleguide ersetzen. */
   :root {
-    --bg: #f5f6f8;
+    --brand-night: #07141c;
+    --brand-petrol: #154c67;
+    --brand-cyan: #4dd2da;
+    --brand-lime: #9cc84b;
+    --bg: #f2f6f7;
     --panel: #ffffff;
-    --text: #1d2330;
-    --muted: #667085;
-    --border: #d9dde5;
-    --accent: #2f6fde;
-    --q-high: #fdecec;
-    --q-sat: #fff6e5;
-    --q-inf: #e9f2ff;
-    --q-mon: #f1f3f6;
-    --pro: #1f9d55;
-    --neu: #8a94a6;
+    --text: #0b1c26;
+    --muted: #587080;
+    --border: #d3dee3;
+    --accent: var(--brand-petrol);
+    --accent-rgb: 21, 76, 103;
+    --on-accent: #ffffff;
+    --q-high: #dcf3f4;
+    --q-sat: #eef5e0;
+    --q-inf: #e3edf2;
+    --q-mon: #f0f3f5;
+    --pro: #5f9a1f;
+    --neu: #8a97a3;
     --con: #d64545;
     --warn: #b7791f;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #14171d;
-      --panel: #1c2028;
-      --text: #e6e9ef;
-      --muted: #98a2b3;
-      --border: #333a47;
-      --accent: #6b9cff;
-      --q-high: #3a2427;
-      --q-sat: #3a3122;
-      --q-inf: #1f2b40;
-      --q-mon: #232833;
+      --bg: #050f15;
+      --panel: #0c1c25;
+      --text: #e6eff2;
+      --muted: #8ea5b0;
+      --border: #22404d;
+      --accent: var(--brand-cyan);
+      --accent-rgb: 77, 210, 218;
+      --on-accent: var(--brand-night);
+      --q-high: #0f3640;
+      --q-sat: #1d3120;
+      --q-inf: #102a38;
+      --q-mon: #13232c;
     }
   }
   * { box-sizing: border-box; }
@@ -44,10 +53,17 @@
   }
   header {
     display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
-    padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--border);
+    padding: 12px 20px; border-bottom: 3px solid;
+    border-image: linear-gradient(90deg, var(--brand-lime), var(--brand-cyan) 60%, var(--brand-petrol)) 0 0 1;
     position: sticky; top: 0; z-index: 10;
+    /* Kopfzeile immer dunkel wie auf sefe.eu */
+    --panel: #0c1c25; --text: #e6eff2; --muted: #8ea5b0; --border: #2a4757;
+    --accent: var(--brand-cyan); --on-accent: var(--brand-night); --warn: #e3b25a;
+    background: var(--brand-night); color: var(--text);
   }
-  header h1 { font-size: 18px; margin: 0 12px 0 0; }
+  header h1 { font-size: 18px; font-weight: 600; margin: 0 12px 0 0; display: flex; align-items: center; gap: 12px; }
+  .brand-logo { display: block; height: 26px; width: auto; }
+  header h1 .sep { width: 1px; align-self: stretch; background: var(--border); }
   .header-actions { display: flex; flex-wrap: wrap; gap: 8px; }
   .file-info { display: flex; flex-direction: column; margin-right: auto; min-width: 0; }
   .file-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -59,7 +75,8 @@
     border: 1px solid var(--border); background: var(--panel); color: var(--text);
   }
   button:hover { border-color: var(--accent); }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  button.primary:hover { filter: brightness(1.12); }
   button.danger:hover { border-color: var(--con); color: var(--con); }
   .banner {
     margin: 12px 20px 0; padding: 10px 14px; border-radius: 8px;
@@ -121,7 +138,7 @@
   .chip.selected { z-index: 3; }
   .chip.dragging { opacity: .3; }
   .chip.armed .dot { animation: pulse 1.2s ease-in-out infinite; }
-  @keyframes pulse { 50% { box-shadow: 0 0 0 7px rgba(47, 111, 222, .35); } }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 7px rgba(var(--accent-rgb), .35); } }
   body.placing .plane { cursor: crosshair; outline: 3px dashed var(--accent); outline-offset: 2px; }
   .place-bar {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
@@ -186,6 +203,7 @@
     .pool { min-height: 44px; padding: 6px; gap: 6px; }
     .matrix-wrap { max-width: max(260px, calc(100svh - 260px)); margin: 0 auto; }
     header h1 { font-size: 16px; }
+    .brand-logo { height: 22px; }
     .file-info { flex-basis: calc(100% - 160px); }
     .header-actions { flex-wrap: nowrap; gap: 6px; width: 100%; }
     .header-actions button { flex: 1 1 0; padding: 8px 4px; font-size: 13px; }
@@ -239,7 +257,12 @@
 </head>
 <body>
 <header>
-  <h1>Stakeholder-Map</h1>
+  <h1>
+    <!-- SEFE-Logo, aus einem Screenshot von sefe.eu ausgeschnitten. Bei Gelegenheit durch die offizielle SVG-Datei ersetzen. -->
+    <img class="brand-logo" id="brandLogo" alt="SEFE" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKcAAAAmCAYAAACh+ouRAAAFPklEQVR42u2cWWhdRRjHf8m9Sa2YonTRKJQ0TbS1SF364pMg7qKooAiiiFVB3IgLgg+2ivqiD3ZRUYtxqYIPFsGHqk99KlUp0qBVaxM14NK40LTQmO1eH853wslw5iz3zsw5N50/XHJyZ84s33zn+77/N3NuW71ex8OjjGj3IvDwyunh4VA5rwB2AYeBKaBu4OPhMYdqA/e8BdzrRedRJsu5SaybV0yPUlnOIeACLy6PMinnMmAYWLIA5nk9cA7QD5wN9MTUqyV4lCrwD/AxMChxtg7PNDDGWkr5IvFcJyTWPxQpewToSrm/TfO9LtaviBx2A1/Kd3eI3KaBU2TMjfKW2Zj+RoCdcwNOyHNWRRAdDpWozUKbu4CbLbT7E3CdEMIouoBjluU0ALySQcFMYAdwn1z/CJxrsa9fo0YjyXKOOlZM0+gEJi223y8KeiYw1iTJzIvpGCtUsdRXXbFuNjGThRC9BnRryo4D24GrpE5bzk/NkXK+76ifNxxY/zQPM7tAwszOtJhzMfCA5uaXgScdZgiawW2O+rkpYwxnbREtW+t6jrjYqEeIm9R7mhvXAQdb5Ak8I6V8j5CINAUISc/DkbirWRyQWL4zp8WdFLdajVkHmw9EVk/wjYEH7qt5HccQIvWLceAs4D8LT6ItQtSvsNkohoG+Btr8G1iqKVsi4U54Pa6ptw+41FKsVnFAMg8Dq12RWdVy3hBTx6RiukLSeMcbbPNBYI3IbFLCk5lIHJ7FxXa2UJajcKiCvFv5/9GUhe4RwSxSmZakBaYLmtdEQtnFwO3iQkZytPmRAc8w4yAuXDBQ3XrUbE+J0qm4DHhcY2Wj6AV+Lsit28g1TgC/EKSPRgmS8Xti6i1nfmpJxX7NPOsZDMkUsAX4oACZprn1A/LwVUVWlYyEOBzfCHBrkuVcGbneGtPwF8CVLeBqjltoczGwVj4AD4lAr2Z+Ij5NyS5pchxrHVrVeUnxFKxvcl5r0rQ4mnQfVMrezaGYZcDbDvroFUtaxcM4knKOBxX2e1eLzW2jMHMXeH2hk5OyKWcUAw7G8peFNvuAy4F3LJOzG0u4Zi2fFVAJUV0zkEbiltUaNlxPIAobHMz5dIL0WJcynvBvuAtSEQLSK3HiY8CpGRauG/g9gTRc2EJsXY05h0UecahgeAfJ1bZXiKQ835DBvk8jSIOpwpuVfj7N0dYQ8AmwDTiSoX5SuqiIPfAN4jWifKIWGU9FWa9KxEIfyfEQGH9AbCpnXBrpooT6bxrseyXwvKbsu5zKGWIspbwjQ+hQBHHa7yikaBnl3JtAUnTY58jNrQOuJThEm0dO21LqZIlpe4DNmvGlWdUw5zxBkMPdXjL+spVgi7c9RolrGdZlVuT8ooRT1mLOa4DPcyjNIHCPQUGtyOiC/wD+FKHMxAi0Xazw0hxkYZklchfFv8qYXCXhR4BVlud2PvC9Lcu5W6OYTyfcs9HwGMYy1utGf261KNfZCJp5XaK0MD2hDwleXVCxCnhBc88mS2xzp0M5bikq3dLi+mK9sxrBeybrCV6AUtFFsIsSh0PAc5bmdif6Y3Mm8SruTt2fVMjq1hu1Bt3AD8QfAjgm5MQmziM4pPIUwYEMUzghpG8A+DaGtZdl3UzDxdHJOfllJUSN4AngJU3ZqFjao46FuzwSY3akxGzh/MP86FHgN5KP43kYhEnl7CPYg7+FYDtvhaaerV0Sj5PIrdsgKZuBZ73YPcoUu+wA7sf/kpxHwco5QbBT8DXBL9J95sXsYUI5/VlEj9LA/7Kxh1dOD4+8+B9EMyc6dyd1PAAAAABJRU5ErkJggg==">
+    <span class="sep"></span>
+    Stakeholder-Map
+  </h1>
   <div class="file-info">
     <span class="file-name" id="fileName">Keine Datei</span>
     <span class="status" id="status">Noch nicht gespeichert</span>
@@ -1041,8 +1064,13 @@ class PdfPage {
       `${n2(x + k)} ${n2(y - r)} ${n2(x + r)} ${n2(y - k)} ${n2(x + r)} ${n2(y)} c`,
       mode);
   }
+  // Bild aus buildPdf(…, images); x/y = obere linke Ecke.
+  image(name, x, y, w, h) {
+    this.ops.push(`q ${n2(w)} 0 0 ${n2(h)} ${n2(x)} ${n2(this.height - y - h)} cm /${name} Do Q`);
+    return this;
+  }
   // y ist die Grundlinie. align: left | center | right; rotate: Text senkrecht nach oben.
-  text(str, x, y, { size = 10, bold = false, color = '#1d2330', align = 'left', rotate = false } = {}) {
+  text(str, x, y, { size = 10, bold = false, color = PDF_COLORS.text, align = 'left', rotate = false } = {}) {
     const w = textWidth(str, size, bold);
     const shift = align === 'right' ? w : align === 'center' ? w / 2 : 0;
     const matrix = rotate
@@ -1053,8 +1081,19 @@ class PdfPage {
   }
 }
 
-function buildPdf(pages) {
+function buildPdf(pages, images = {}) {
   const objects = [];
+  // Bilder (je Bild + SMask) hinter den Seiten ablegen
+  let nextId = 5 + pages.length * 2;
+  const xobjects = Object.entries(images).filter(([, im]) => im).map(([name, im]) => {
+    const id = nextId, maskId = nextId + 1;
+    nextId += 2;
+    const head = `/Type /XObject /Subtype /Image /Width ${im.w} /Height ${im.h} /BitsPerComponent 8`;
+    objects[id] = `<< ${head} /ColorSpace /DeviceRGB /SMask ${maskId} 0 R /Length ${im.rgb.length} >>\nstream\n${im.rgb}\nendstream`;
+    objects[maskId] = `<< ${head} /ColorSpace /DeviceGray /Length ${im.alpha.length} >>\nstream\n${im.alpha}\nendstream`;
+    return `/${name} ${id} 0 R`;
+  });
+  const xobj = xobjects.length ? ` /XObject << ${xobjects.join(' ')} >>` : '';
   objects[1] = '<< /Type /Catalog /Pages 2 0 R >>';
   objects[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
   objects[4] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
@@ -1064,7 +1103,7 @@ function buildPdf(pages) {
     const content = page.ops.join('\n');
     kids.push(pageId + ' 0 R');
     objects[pageId] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${page.width} ${page.height}] ` +
-      `/Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${pageId + 1} 0 R >>`;
+      `/Resources << /Font << /F1 3 0 R /F2 4 0 R >>${xobj} >> /Contents ${pageId + 1} 0 R >>`;
     objects[pageId + 1] = `<< /Length ${content.length} >>\nstream\n${content}\nendstream`;
   });
   objects[2] = `<< /Type /Pages /Kids [${kids.join(' ')}] /Count ${pages.length} >>`;
@@ -1086,17 +1125,45 @@ function buildPdf(pages) {
   return bytes;
 }
 
+// SEFE-Farben wie in :root.
 const PDF_COLORS = {
-  text: '#1d2330', muted: '#667085', border: '#c9ced8', white: '#ffffff',
-  high: '#fdecec', sat: '#fff6e5', inf: '#e9f2ff', mon: '#f1f3f6', head: '#eef0f4',
-  pro: '#1f9d55', neutral: '#8a94a6', con: '#d64545',
+  text: '#0b1c26', muted: '#587080', border: '#c2d1d8', white: '#ffffff',
+  high: '#dcf3f4', sat: '#eef5e0', inf: '#e3edf2', mon: '#f0f3f5', head: '#e6eef1',
+  pro: '#5f9a1f', neutral: '#8a97a3', con: '#d64545',
+  night: '#07141c', petrol: '#154c67', cyan: '#4dd2da', lime: '#9cc84b',
 };
+
+// Logo aus dem Kopfbereich als PDF-Bild: Fläche in einer Farbe, Form über den Alphakanal (SMask).
+function logoImage(hex) {
+  const img = $('brandLogo');
+  if (!img || !img.complete || !img.naturalWidth) return null;
+  const w = img.naturalWidth, h = img.naturalHeight;
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0);
+  const px = ctx.getImageData(0, 0, w, h).data;
+  const c = hex.match(/\w\w/g).map((v) => String.fromCharCode(parseInt(v, 16))).join('');
+  let rgb = '', alpha = '';
+  for (let i = 0; i < px.length; i += 4) { rgb += c; alpha += String.fromCharCode(px[i + 3]); }
+  return { w, h, rgb, alpha };
+}
 const QUADRANT_ORDER = ['Eng einbinden', 'Zufriedenstellen', 'Informieren', 'Beobachten', '–'];
 
 function drawMatrixPage(page, margin) {
   const C = PDF_COLORS;
   const W = page.width, H = page.height;
-  page.text('Stakeholder-Map', margin, margin + 14, { size: 18, bold: true });
+  // Markenleiste oben, darunter Logo und Titel
+  const band = [C.lime, C.cyan, C.petrol];
+  band.forEach((c, i) => page.fill(c).rect(i * W / band.length, 0, W / band.length + 0.5, 5));
+  let titleX = margin;
+  if (page.logo) {
+    const lh = 17, lw = lh * page.logo.w / page.logo.h;
+    page.image('Logo', margin, margin + 14 - lh + 1, lw, lh);
+    page.stroke(C.border, 0.8).line(margin + lw + 10, margin - 1, margin + lw + 10, margin + 17);
+    titleX = margin + lw + 20;
+  }
+  page.text('Stakeholder-Map', titleX, margin + 14, { size: 18, bold: true });
   const now = new Date();
   const stand = 'Stand: ' + now.toLocaleDateString('de-DE') + ', ' +
     now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
@@ -1235,13 +1302,15 @@ function drawTablePages(pages, margin) {
 function exportPdf() {
   const margin = 36;
   const pages = [new PdfPage(842, 595)];          // A4 quer
+  const logo = logoImage(PDF_COLORS.night);
+  pages[0].logo = logo;
   drawMatrixPage(pages[0], margin);
   drawTablePages(pages, margin);
   pages.forEach((p, i) => p.text(`Seite ${i + 1} von ${pages.length}`, p.width - margin, p.height - 18,
     { size: 8, color: PDF_COLORS.muted, align: 'right' }));
 
   const base = fileName ? fileName.replace(/\.json$/i, '') : 'stakeholder-map';
-  deliverFile(new Blob([buildPdf(pages)], { type: 'application/pdf' }), base + '.pdf');
+  deliverFile(new Blob([buildPdf(pages, { Logo: logo })], { type: 'application/pdf' }), base + '.pdf');
 }
 
 // ---------- Events ----------

@@ -13,6 +13,13 @@ Drag-and-drop-Tool für Stakeholder-Management als **eine einzige HTML-Datei**: 
 4. **Speichern unter…** wählt die JSON-Datei, in der alle Daten liegen.
 5. **PDF** lädt eine PDF-Datei (A4 quer) herunter: Seite 1 zeigt die Matrix mit einer Übersicht nach Quadranten, danach folgt die vollständige Stakeholderliste mit Notizen.
 
+## SEFE-Branding
+
+Das Tool ist im Stil von [sefe.eu](https://www.sefe.eu) gestaltet: dunkle Kopfzeile mit SEFE-Logo, Farben Nachtblau, Petrol, Cyan und Lime. Das Erscheinungsbild gilt auch für den PDF-Export.
+
+- **Logo:** Das Logo ist aus einem Screenshot von sefe.eu ausgeschnitten und als PNG in `index.html` eingebettet (`<img id="brandLogo">`). Sobald die offizielle SVG-Datei vorliegt, dort ersetzen; der PDF-Export übernimmt das Logo automatisch.
+- **Farben:** `--brand-night`, `--brand-petrol`, `--brand-cyan` und `--brand-lime` am Anfang des `<style>`-Blocks sind von der Website abgelesen. Für den PDF-Export gelten dieselben Werte in `PDF_COLORS`.
+
 ## Datenhaltung
 
 Alle Daten liegen in einer JSON-Datei, die du selbst auswählst (z. B. `stakeholder.json`).
