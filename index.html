@@ -485,6 +485,10 @@ async function saveAs() {
   }
 }
 
+// In eingebetteten Vorschauen (iframes, z. B. in Apps) sind Downloads oft gesperrt.
+const EMBEDDED = (() => { try { return window.self !== window.top; } catch { return true; } })();
+const IS_TOUCH = window.matchMedia('(pointer: coarse)').matches;
+
 function downloadBlob(blob, name) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -492,7 +496,26 @@ function downloadBlob(blob, name) {
   document.body.appendChild(a);
   a.click();
   a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  // iOS Safari fragt erst nach und lädt die Datei danach – daher nicht sofort freigeben.
+  setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+  if (EMBEDDED) {
+    ask('Falls kein Download startet: In eingebetteten Vorschauen (z. B. innerhalb einer App) sperrt der Browser ' +
+      'Downloads. Öffne die index.html dann direkt im Browser.', 'OK', null);
+  }
+}
+
+// Auf Touch-Geräten über das Teilen-Menü (In Dateien sichern, Mail, Drucken …), sonst als Download.
+async function deliverFile(blob, name) {
+  const file = new File([blob], name, { type: blob.type });
+  if (IS_TOUCH && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: name });
+      return;
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+    }
+  }
+  downloadBlob(blob, name);
 }
 
 function download() {
@@ -1219,7 +1242,7 @@ function exportPdf() {
     { size: 8, color: PDF_COLORS.muted, align: 'right' }));
 
   const base = fileName ? fileName.replace(/\.json$/i, '') : 'stakeholder-map';
-  downloadBlob(new Blob([buildPdf(pages)], { type: 'application/pdf' }), base + '.pdf');
+  deliverFile(new Blob([buildPdf(pages)], { type: 'application/pdf' }), base + '.pdf');
 }
 
 // ---------- Events ----------
