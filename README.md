@@ -15,10 +15,10 @@ Drag-and-drop-Tool für Stakeholder-Management als **eine einzige HTML-Datei**: 
 
 ## SEFE-Branding
 
-Das Tool ist für SEFE gestaltet. Logo und Farben sind noch **Platzhalter** und müssen durch die offiziellen Vorgaben ersetzt werden:
+Das Tool ist im Stil von [sefe.eu](https://www.sefe.eu) gestaltet: dunkle Kopfzeile mit SEFE-Logo, Farben Nachtblau, Petrol, Cyan und Lime. Das Erscheinungsbild gilt auch für den PDF-Export.
 
-- **Logo:** In `index.html` steht im Kopfbereich `<span class="brand-logo placeholder">SEFE</span>`. Dort das offizielle Logo als inline-SVG oder `<img>` einsetzen und die Klasse `placeholder` entfernen.
-- **Farben:** Die geschätzten Werte `--brand-blue`, `--brand-sky` und `--brand-green` stehen am Anfang des `<style>`-Blocks. Für den PDF-Export gelten dieselben Werte in `PDF_COLORS`.
+- **Logo:** Das Logo ist aus einem Screenshot von sefe.eu ausgeschnitten und als PNG in `index.html` eingebettet (`<img id="brandLogo">`). Sobald die offizielle SVG-Datei vorliegt, dort ersetzen; der PDF-Export übernimmt das Logo automatisch.
+- **Farben:** `--brand-night`, `--brand-petrol`, `--brand-cyan` und `--brand-lime` am Anfang des `<style>`-Blocks sind von der Website abgelesen. Für den PDF-Export gelten dieselben Werte in `PDF_COLORS`.
 
 ## Datenhaltung
 
