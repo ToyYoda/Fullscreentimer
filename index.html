@@ -813,9 +813,8 @@ function addStakeholder(afterId) {
   if (input) input.focus();
 }
 
-async function removeStakeholder(id) {
-  const s = byId(id);
-  if (!s || !(await ask(`„${s.name || 'Ohne Namen'}“ wirklich löschen?`, 'Löschen', 'Abbrechen', true))) return;
+function removeStakeholder(id) {
+  if (!byId(id)) return;
   stakeholders = stakeholders.filter((x) => x.id !== id);
   if (selectedId === id) selectedId = null;
   renderAll();
