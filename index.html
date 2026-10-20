@@ -3,36 +3,44 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Stakeholder-Map</title>
+<title>Stakeholder-Map · SEFE</title>
 <style>
+  /* SEFE-Farben: geschätzt (Blau/Grün aus dem Logo-Verlauf), durch die Werte aus dem SEFE-Styleguide ersetzen. */
   :root {
-    --bg: #f5f6f8;
+    --brand-blue: #003a70;
+    --brand-sky: #2a8fd0;
+    --brand-green: #6cb33f;
+    --bg: #f3f6f9;
     --panel: #ffffff;
-    --text: #1d2330;
-    --muted: #667085;
-    --border: #d9dde5;
-    --accent: #2f6fde;
-    --q-high: #fdecec;
-    --q-sat: #fff6e5;
-    --q-inf: #e9f2ff;
+    --text: #13253d;
+    --muted: #5f6f84;
+    --border: #d5dde6;
+    --accent: var(--brand-blue);
+    --accent-rgb: 0, 58, 112;
+    --on-accent: #ffffff;
+    --q-high: #e3edf7;
+    --q-sat: #eef6e7;
+    --q-inf: #e6f3fb;
     --q-mon: #f1f3f6;
-    --pro: #1f9d55;
+    --pro: #4f9a2a;
     --neu: #8a94a6;
     --con: #d64545;
     --warn: #b7791f;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #14171d;
-      --panel: #1c2028;
-      --text: #e6e9ef;
-      --muted: #98a2b3;
-      --border: #333a47;
-      --accent: #6b9cff;
-      --q-high: #3a2427;
-      --q-sat: #3a3122;
-      --q-inf: #1f2b40;
-      --q-mon: #232833;
+      --bg: #0d1724;
+      --panel: #142233;
+      --text: #e5ecf3;
+      --muted: #94a3b6;
+      --border: #2b3c51;
+      --accent: #4ea3e0;
+      --accent-rgb: 78, 163, 224;
+      --on-accent: #0d1724;
+      --q-high: #18324d;
+      --q-sat: #1f3324;
+      --q-inf: #163447;
+      --q-mon: #1b2838;
     }
   }
   * { box-sizing: border-box; }
@@ -46,8 +54,16 @@
     display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
     padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--border);
     position: sticky; top: 0; z-index: 10;
+    border-image: linear-gradient(90deg, var(--brand-green), var(--brand-sky) 55%, var(--brand-blue)) 0 0 1;
+    border-bottom-width: 3px;
   }
-  header h1 { font-size: 18px; margin: 0 12px 0 0; }
+  header h1 { font-size: 18px; margin: 0 12px 0 0; display: flex; align-items: center; gap: 10px; }
+  .brand-logo { display: inline-flex; align-items: center; height: 32px; }
+  .brand-logo svg, .brand-logo img { height: 100%; width: auto; }
+  .brand-logo.placeholder {
+    padding: 0 10px; border-radius: 6px; color: #fff; font-weight: 800; letter-spacing: .08em; font-size: 15px;
+    background: linear-gradient(135deg, var(--brand-green), var(--brand-sky) 60%, var(--brand-blue));
+  }
   .header-actions { display: flex; flex-wrap: wrap; gap: 8px; }
   .file-info { display: flex; flex-direction: column; margin-right: auto; min-width: 0; }
   .file-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -59,7 +75,8 @@
     border: 1px solid var(--border); background: var(--panel); color: var(--text);
   }
   button:hover { border-color: var(--accent); }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  button.primary:hover { filter: brightness(1.12); }
   button.danger:hover { border-color: var(--con); color: var(--con); }
   .banner {
     margin: 12px 20px 0; padding: 10px 14px; border-radius: 8px;
@@ -121,7 +138,7 @@
   .chip.selected { z-index: 3; }
   .chip.dragging { opacity: .3; }
   .chip.armed .dot { animation: pulse 1.2s ease-in-out infinite; }
-  @keyframes pulse { 50% { box-shadow: 0 0 0 7px rgba(47, 111, 222, .35); } }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 7px rgba(var(--accent-rgb), .35); } }
   body.placing .plane { cursor: crosshair; outline: 3px dashed var(--accent); outline-offset: 2px; }
   .place-bar {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
@@ -186,6 +203,7 @@
     .pool { min-height: 44px; padding: 6px; gap: 6px; }
     .matrix-wrap { max-width: max(260px, calc(100svh - 260px)); margin: 0 auto; }
     header h1 { font-size: 16px; }
+    .brand-logo { height: 26px; }
     .file-info { flex-basis: calc(100% - 160px); }
     .header-actions { flex-wrap: nowrap; gap: 6px; width: 100%; }
     .header-actions button { flex: 1 1 0; padding: 8px 4px; font-size: 13px; }
@@ -239,7 +257,11 @@
 </head>
 <body>
 <header>
-  <h1>Stakeholder-Map</h1>
+  <h1>
+    <!-- Platzhalter: hier das offizielle SEFE-Logo einsetzen (inline-SVG oder <img>) und die Klasse „placeholder“ entfernen. -->
+    <span class="brand-logo placeholder" aria-label="SEFE">SEFE</span>
+    Stakeholder-Map
+  </h1>
   <div class="file-info">
     <span class="file-name" id="fileName">Keine Datei</span>
     <span class="status" id="status">Noch nicht gespeichert</span>
@@ -1042,7 +1064,7 @@ class PdfPage {
       mode);
   }
   // y ist die Grundlinie. align: left | center | right; rotate: Text senkrecht nach oben.
-  text(str, x, y, { size = 10, bold = false, color = '#1d2330', align = 'left', rotate = false } = {}) {
+  text(str, x, y, { size = 10, bold = false, color = PDF_COLORS.text, align = 'left', rotate = false } = {}) {
     const w = textWidth(str, size, bold);
     const shift = align === 'right' ? w : align === 'center' ? w / 2 : 0;
     const matrix = rotate
@@ -1086,17 +1108,23 @@ function buildPdf(pages) {
   return bytes;
 }
 
+// SEFE-Farben wie in :root (geschätzt).
 const PDF_COLORS = {
-  text: '#1d2330', muted: '#667085', border: '#c9ced8', white: '#ffffff',
-  high: '#fdecec', sat: '#fff6e5', inf: '#e9f2ff', mon: '#f1f3f6', head: '#eef0f4',
-  pro: '#1f9d55', neutral: '#8a94a6', con: '#d64545',
+  text: '#13253d', muted: '#5f6f84', border: '#c3cedb', white: '#ffffff',
+  high: '#e3edf7', sat: '#eef6e7', inf: '#e6f3fb', mon: '#f1f3f6', head: '#e8eef5',
+  pro: '#4f9a2a', neutral: '#8a94a6', con: '#d64545',
+  blue: '#003a70', sky: '#2a8fd0', green: '#6cb33f',
 };
 const QUADRANT_ORDER = ['Eng einbinden', 'Zufriedenstellen', 'Informieren', 'Beobachten', '–'];
 
 function drawMatrixPage(page, margin) {
   const C = PDF_COLORS;
   const W = page.width, H = page.height;
-  page.text('Stakeholder-Map', margin, margin + 14, { size: 18, bold: true });
+  // Markenleiste oben und Kopfzeile in SEFE-Blau
+  const band = [C.green, C.sky, C.blue];
+  band.forEach((c, i) => page.fill(c).rect(i * W / band.length, 0, W / band.length + 0.5, 5));
+  const brandW = page.text('SEFE', margin, margin + 14, { size: 18, bold: true, color: C.blue });
+  page.text('Stakeholder-Map', margin + brandW + 8, margin + 14, { size: 18, bold: true });
   const now = new Date();
   const stand = 'Stand: ' + now.toLocaleDateString('de-DE') + ', ' +
     now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
