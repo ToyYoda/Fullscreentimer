@@ -67,6 +67,8 @@
     display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
   }
   .banner[hidden] { display: none; }
+  .banner > span { flex: 1 1 200px; }
+  .banner-close { padding: 2px 10px; font-size: 18px; line-height: 1; }
   main { padding: 16px 20px 40px; display: grid; gap: 16px; }
   .board { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 16px; align-items: start; }
   @media (max-width: 900px) { .board { grid-template-columns: 1fr; } }
@@ -118,6 +120,18 @@
   .chip.selected .dot { outline: 3px solid var(--accent); outline-offset: 1px; }
   .chip.selected { z-index: 3; }
   .chip.dragging { opacity: .3; }
+  .chip.armed .dot { animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 7px rgba(47, 111, 222, .35); } }
+  body.placing .plane { cursor: crosshair; outline: 3px dashed var(--accent); outline-offset: 2px; }
+  .place-bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+    background: var(--panel); border-top: 2px solid var(--accent); box-shadow: 0 -2px 10px rgba(0,0,0,.15);
+  }
+  .place-bar[hidden] { display: none; }
+  .place-bar span { flex: 1 1 200px; }
+  body.placing main { padding-bottom: 90px; }
   .chip.ghost {
     position: fixed; z-index: 1000; pointer-events: none; cursor: grabbing;
     transform: translate(-15px, -50%);
@@ -165,11 +179,17 @@
     .board .hint { display: none; }
   }
   @media (max-width: 700px) {
-    header { padding: 10px 12px; gap: 8px; }
+    /* Ablage über der Matrix, Kopfzeile scrollt mit: beides passt zusammen auf den Bildschirm */
+    header { position: static; padding: 10px 12px; gap: 8px; }
+    .board > .card:last-child { order: -1; }
+    .board .card h2 { margin-bottom: 6px; }
+    .pool { min-height: 44px; padding: 6px; gap: 6px; }
+    .matrix-wrap { max-width: max(260px, calc(100svh - 260px)); margin: 0 auto; }
     header h1 { font-size: 16px; }
     .file-info { flex-basis: calc(100% - 160px); }
     .header-actions { flex-wrap: nowrap; gap: 6px; width: 100%; }
     .header-actions button { flex: 1 1 0; padding: 8px 4px; font-size: 13px; }
+    .desktop-only { display: none; }
     .banner { margin: 10px 12px 0; font-size: 13px; }
     main { padding: 12px 12px 32px; gap: 12px; }
     .card { padding: 10px; }
@@ -229,6 +249,7 @@
     <button id="btnOpen" type="button">Öffnen…</button>
     <button id="btnSave" type="button" class="primary">Speichern</button>
     <button id="btnSaveAs" type="button">Speichern unter…</button>
+    <button id="btnPdf" type="button" title="Matrix und Stakeholderliste als PDF herunterladen">PDF</button>
   </div>
   <input id="fileInput" type="file" accept=".json,application/json" class="visually-hidden">
 </header>
@@ -241,6 +262,7 @@
 <div class="banner" id="fallbackBanner" hidden>
   <span>Dieser Browser kann Dateien nicht direkt überschreiben. „Speichern“ lädt die Datei herunter –
     ersetze damit deine bisherige Datei. Für automatisches Speichern am Computer Chrome oder Edge verwenden.</span>
+  <button id="btnHideFallback" type="button" class="banner-close" aria-label="Hinweis ausblenden">×</button>
 </div>
 
 <main>
@@ -267,8 +289,8 @@
     <div class="card">
       <h2>Nicht platziert <span class="count" id="poolCount"></span></h2>
       <div class="pool" id="pool"></div>
-      <p class="hint">Stakeholder in die Matrix ziehen. Zurück hierher ziehen, um sie aus der Matrix zu entfernen.
-        Klick auf einen Stakeholder markiert die Zeile in der Liste.</p>
+      <p class="hint">Stakeholder in die Matrix ziehen – oder antippen und dann auf die gewünschte Stelle in der Matrix tippen.
+        Zurück hierher ziehen bzw. tippen, um sie aus der Matrix zu entfernen.</p>
     </div>
   </section>
 
@@ -298,6 +320,12 @@
   </section>
 </main>
 
+<div class="place-bar" id="placeBar" hidden>
+  <span id="placeText"></span>
+  <button id="btnUnplace" type="button">Aus Matrix entfernen</button>
+  <button id="btnPlaceDone" type="button">Abbrechen</button>
+</div>
+
 <dialog id="askDialog">
   <p id="askText"></p>
   <div class="dialog-actions">
@@ -323,6 +351,7 @@ let fileName = null;        // Anzeigename bzw. Name für den Download
 let dirty = false;
 let saveTimer = null;
 let selectedId = null;
+let armedId = null;         // Stakeholder, der per Tippen platziert wird
 
 const $ = (id) => document.getElementById(id);
 const plane = $('plane');
@@ -456,16 +485,42 @@ async function saveAs() {
   }
 }
 
-function download() {
-  const blob = new Blob([serialize()], { type: 'application/json' });
+// In eingebetteten Vorschauen (iframes, z. B. in Apps) sind Downloads oft gesperrt.
+const EMBEDDED = (() => { try { return window.self !== window.top; } catch { return true; } })();
+const IS_TOUCH = window.matchMedia('(pointer: coarse)').matches;
+
+function downloadBlob(blob, name) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = fileName || 'stakeholder.json';
+  a.download = name;
   document.body.appendChild(a);
   a.click();
   a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  fileName = a.download;
+  // iOS Safari fragt erst nach und lädt die Datei danach – daher nicht sofort freigeben.
+  setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+  if (EMBEDDED) {
+    ask('Falls kein Download startet: In eingebetteten Vorschauen (z. B. innerhalb einer App) sperrt der Browser ' +
+      'Downloads. Öffne die index.html dann direkt im Browser.', 'OK', null);
+  }
+}
+
+// Auf Touch-Geräten über das Teilen-Menü (In Dateien sichern, Mail, Drucken …), sonst als Download.
+async function deliverFile(blob, name) {
+  const file = new File([blob], name, { type: blob.type });
+  if (IS_TOUCH && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: name });
+      return;
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+    }
+  }
+  downloadBlob(blob, name);
+}
+
+function download() {
+  fileName = fileName || 'stakeholder.json';
+  downloadBlob(new Blob([serialize()], { type: 'application/json' }), fileName);
   dirty = false;
   setStatus('Heruntergeladen um ' + new Date().toLocaleTimeString('de-DE'));
   updateFileInfo();
@@ -593,7 +648,7 @@ async function offerReopen() {
 
 function makeChip(s) {
   const chip = document.createElement('div');
-  chip.className = 'chip' + (s.id === selectedId ? ' selected' : '');
+  chip.className = 'chip' + (s.id === selectedId ? ' selected' : '') + (s.id === armedId ? ' armed' : '');
   chip.dataset.id = s.id;
   chip.dataset.attitude = s.attitude;
   const tooltip = [s.name || 'Ohne Namen', s.role, s.org].filter(Boolean).join(' · ');
@@ -610,6 +665,7 @@ function makeChip(s) {
 }
 
 function renderBoard() {
+  if (armedId && !byId(armedId)) disarm();
   plane.querySelectorAll('.chip').forEach((c) => c.remove());
   pool.replaceChildren();
 
@@ -768,6 +824,46 @@ async function removeStakeholder(id) {
 
 // ---------- Drag & Drop (Pointer Events: Maus, Touch und Stift) ----------
 
+// ---------- Platzieren per Tippen (ohne Ziehen, z. B. auf dem Handy) ----------
+
+function arm(id) {
+  armedId = id;
+  const s = byId(id);
+  $('placeText').textContent = `„${s.name || 'Ohne Namen'}“: in die Matrix tippen, um zu platzieren.`;
+  $('btnUnplace').hidden = !isPlaced(s);
+  $('placeBar').hidden = false;
+  document.body.classList.add('placing');
+  document.querySelectorAll('.chip').forEach((c) => c.classList.toggle('armed', c.dataset.id === id));
+}
+
+function disarm() {
+  armedId = null;
+  $('placeBar').hidden = true;
+  document.body.classList.remove('placing');
+  document.querySelectorAll('.chip.armed').forEach((c) => c.classList.remove('armed'));
+}
+
+function placeArmed(x, y) {
+  const s = byId(armedId);
+  disarm();
+  if (!s) return;
+  s.x = x;
+  s.y = y;
+  selectedId = s.id;
+  renderAll();
+  markDirty();
+}
+
+plane.addEventListener('click', (e) => {
+  if (!armedId || e.target.closest('.chip')) return;
+  const rect = plane.getBoundingClientRect();
+  placeArmed(clamp((e.clientX - rect.left) / rect.width), clamp(1 - (e.clientY - rect.top) / rect.height));
+});
+
+pool.addEventListener('click', (e) => {
+  if (armedId && !e.target.closest('.chip')) placeArmed(null, null);
+});
+
 function inside(rect, e) {
   return e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
 }
@@ -781,6 +877,7 @@ function startDrag(e) {
   const startY = e.clientY;
   const liftY = e.pointerType === 'touch' ? -45 : 0;
   let ghost = null;
+  if (armedId && armedId !== id) disarm();
 
   const onMove = (ev) => {
     if (!ghost) {
@@ -807,6 +904,7 @@ function startDrag(e) {
 
     if (!ghost) {
       select(id);
+      armedId === id ? disarm() : arm(id);
       return;
     }
     ghost.remove();
@@ -835,15 +933,330 @@ function startDrag(e) {
   window.addEventListener('pointercancel', onEnd);
 }
 
+// ---------- PDF-Export (ohne Bibliothek: PDF mit den Standardschriften Helvetica) ----------
+
+// Zeichenbreiten (1/1000 em) für die Codes 32–126, aus den Adobe-Metriken.
+const HELV_WIDTHS = [278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,
+  556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,
+  722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,
+  333,500,278,556,500,722,500,500,500,334,260,334,584];
+const HELV_BOLD_WIDTHS = [278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,
+  556,556,556,333,333,584,584,584,611,975,722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,
+  611,722,667,944,667,667,611,333,278,333,584,556,333,556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,
+  611,389,556,333,611,556,778,556,556,500,389,280,389,584];
+const WIN_ANSI_EXTRA = { '€': 0x80, '‚': 0x82, '„': 0x84, '…': 0x85, '‰': 0x89, '‹': 0x8b, '‘': 0x91, '’': 0x92,
+  '“': 0x93, '”': 0x94, '•': 0x95, '–': 0x96, '—': 0x97, '™': 0x99, '›': 0x9b, 'Š': 0x8a, 'š': 0x9a, 'Œ': 0x8c, 'œ': 0x9c,
+  'Ž': 0x8e, 'ž': 0x9e, 'Ÿ': 0x9f };
+const SPECIAL_WIDTHS = { 'ß': 611, '–': 556, '—': 1000, '…': 1000, '€': 556, '•': 350, '„': 333, '‚': 278, '“': 333,
+  '”': 333, '‘': 222, '’': 222 };
+
+function charWidth(ch, bold) {
+  const table = bold ? HELV_BOLD_WIDTHS : HELV_WIDTHS;
+  ch = TRANSLIT[ch] || ch;
+  let code = ch.charCodeAt(0);
+  if (code >= 32 && code <= 126) return table[code - 32];
+  if (SPECIAL_WIDTHS[ch]) return SPECIAL_WIDTHS[ch];
+  code = ch.normalize('NFD').charCodeAt(0);       // ä → a, é → e …
+  return code >= 32 && code <= 126 ? table[code - 32] : 556;
+}
+
+function textWidth(str, size, bold = false) {
+  let w = 0;
+  for (const ch of str) w += charWidth(ch, bold);
+  return (w / 1000) * size;
+}
+
+const TRANSLIT = { 'ı': 'i', 'ł': 'l', 'Ł': 'L', 'đ': 'd', 'Đ': 'D', 'ħ': 'h', 'ŋ': 'n' };
+
+function winAnsiChar(ch) {
+  const code = ch.charCodeAt(0);
+  if ((code >= 32 && code < 127) || (code >= 160 && code <= 255)) return ch;
+  if (WIN_ANSI_EXTRA[ch]) return String.fromCharCode(WIN_ANSI_EXTRA[ch]);
+  return null;
+}
+
+// Text in WinAnsi-Bytes umwandeln und für PDF-Strings escapen.
+// Nicht darstellbare Zeichen werden auf den Grundbuchstaben zurückgeführt (ć → c, ı → i).
+function pdfString(str) {
+  let out = '';
+  for (const ch of str) {
+    if (ch.charCodeAt(0) < 32) { out += ' '; continue; }
+    const base = ch.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    out += winAnsiChar(ch) ?? winAnsiChar(TRANSLIT[ch] || base || '?') ?? '?';
+  }
+  return '(' + out.replace(/[\\()]/g, '\\$&') + ')';
+}
+
+function wrapText(text, maxWidth, size, bold = false) {
+  const lines = [];
+  for (const para of String(text).split(/\r?\n/)) {
+    let line = '';
+    for (let word of para.split(/\s+/).filter(Boolean)) {
+      // Überlange Wörter hart umbrechen
+      while (textWidth(word, size, bold) > maxWidth && word.length > 1) {
+        let i = 1;
+        while (i < word.length && textWidth(word.slice(0, i + 1), size, bold) <= maxWidth) i++;
+        if (line) { lines.push(line); line = ''; }
+        lines.push(word.slice(0, i));
+        word = word.slice(i);
+      }
+      const candidate = line ? line + ' ' + word : word;
+      if (textWidth(candidate, size, bold) <= maxWidth) line = candidate;
+      else { lines.push(line); line = word; }
+    }
+    lines.push(line);
+  }
+  return lines;
+}
+
+const n2 = (v) => (Math.round(v * 100) / 100).toString();
+
+function pdfRgb(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => n2(v / 255)).join(' ');
+}
+
+// Eine PDF-Seite; Koordinaten von oben links in Punkt (1/72 Zoll).
+class PdfPage {
+  constructor(width, height) {
+    this.width = width;
+    this.height = height;
+    this.ops = [];
+  }
+  fill(hex) { this.ops.push(pdfRgb(hex) + ' rg'); return this; }
+  stroke(hex, width = 0.6) { this.ops.push(pdfRgb(hex) + ' RG ' + n2(width) + ' w'); return this; }
+  rect(x, y, w, h, mode = 'f') {
+    this.ops.push(`${n2(x)} ${n2(this.height - y - h)} ${n2(w)} ${n2(h)} re ${mode}`);
+  }
+  line(x1, y1, x2, y2) {
+    this.ops.push(`${n2(x1)} ${n2(this.height - y1)} m ${n2(x2)} ${n2(this.height - y2)} l S`);
+  }
+  circle(cx, cy, r, mode = 'f') {
+    const k = 0.5523 * r;
+    const x = cx, y = this.height - cy;
+    this.ops.push(
+      `${n2(x + r)} ${n2(y)} m`,
+      `${n2(x + r)} ${n2(y + k)} ${n2(x + k)} ${n2(y + r)} ${n2(x)} ${n2(y + r)} c`,
+      `${n2(x - k)} ${n2(y + r)} ${n2(x - r)} ${n2(y + k)} ${n2(x - r)} ${n2(y)} c`,
+      `${n2(x - r)} ${n2(y - k)} ${n2(x - k)} ${n2(y - r)} ${n2(x)} ${n2(y - r)} c`,
+      `${n2(x + k)} ${n2(y - r)} ${n2(x + r)} ${n2(y - k)} ${n2(x + r)} ${n2(y)} c`,
+      mode);
+  }
+  // y ist die Grundlinie. align: left | center | right; rotate: Text senkrecht nach oben.
+  text(str, x, y, { size = 10, bold = false, color = '#1d2330', align = 'left', rotate = false } = {}) {
+    const w = textWidth(str, size, bold);
+    const shift = align === 'right' ? w : align === 'center' ? w / 2 : 0;
+    const matrix = rotate
+      ? `0 1 -1 0 ${n2(x)} ${n2(this.height - y - shift)}`
+      : `1 0 0 1 ${n2(x - shift)} ${n2(this.height - y)}`;
+    this.ops.push(`BT ${pdfRgb(color)} rg /${bold ? 'F2' : 'F1'} ${n2(size)} Tf ${matrix} Tm ${pdfString(str)} Tj ET`);
+    return w;
+  }
+}
+
+function buildPdf(pages) {
+  const objects = [];
+  objects[1] = '<< /Type /Catalog /Pages 2 0 R >>';
+  objects[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
+  objects[4] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
+  const kids = [];
+  pages.forEach((page, i) => {
+    const pageId = 5 + i * 2;
+    const content = page.ops.join('\n');
+    kids.push(pageId + ' 0 R');
+    objects[pageId] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${page.width} ${page.height}] ` +
+      `/Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${pageId + 1} 0 R >>`;
+    objects[pageId + 1] = `<< /Length ${content.length} >>\nstream\n${content}\nendstream`;
+  });
+  objects[2] = `<< /Type /Pages /Kids [${kids.join(' ')}] /Count ${pages.length} >>`;
+
+  // Alle Strings bestehen aus Zeichen ≤ 255, ein Zeichen entspricht also einem Byte.
+  let out = '%PDF-1.4\n%\xe2\xe3\xcf\xd3\n';
+  const offsets = [];
+  for (let id = 1; id < objects.length; id++) {
+    offsets[id] = out.length;
+    out += `${id} 0 obj\n${objects[id]}\nendobj\n`;
+  }
+  const xref = out.length;
+  out += `xref\n0 ${objects.length}\n0000000000 65535 f \n`;
+  for (let id = 1; id < objects.length; id++) out += String(offsets[id]).padStart(10, '0') + ' 00000 n \n';
+  out += `trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+
+  const bytes = new Uint8Array(out.length);
+  for (let i = 0; i < out.length; i++) bytes[i] = out.charCodeAt(i);
+  return bytes;
+}
+
+const PDF_COLORS = {
+  text: '#1d2330', muted: '#667085', border: '#c9ced8', white: '#ffffff',
+  high: '#fdecec', sat: '#fff6e5', inf: '#e9f2ff', mon: '#f1f3f6', head: '#eef0f4',
+  pro: '#1f9d55', neutral: '#8a94a6', con: '#d64545',
+};
+const QUADRANT_ORDER = ['Eng einbinden', 'Zufriedenstellen', 'Informieren', 'Beobachten', '–'];
+
+function drawMatrixPage(page, margin) {
+  const C = PDF_COLORS;
+  const W = page.width, H = page.height;
+  page.text('Stakeholder-Map', margin, margin + 14, { size: 18, bold: true });
+  const now = new Date();
+  const stand = 'Stand: ' + now.toLocaleDateString('de-DE') + ', ' +
+    now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  page.text([fileName, stand].filter(Boolean).join('  ·  '), margin, margin + 30, { size: 9, color: C.muted });
+
+  // Matrix
+  const top = margin + 50;
+  const size = H - top - margin - 30;
+  const left = margin + 22;
+  const half = size / 2;
+  page.fill(C.sat).rect(left, top, half, half);
+  page.fill(C.high).rect(left + half, top, half, half);
+  page.fill(C.mon).rect(left, top + half, half, half);
+  page.fill(C.inf).rect(left + half, top + half, half, half);
+  page.stroke(C.border, 0.8).rect(left, top, size, size, 'S');
+  page.line(left + half, top, left + half, top + size);
+  page.line(left, top + half, left + size, top + half);
+  const qt = { size: 9, bold: true };
+  page.text('Zufriedenstellen', left + 6, top + 14, qt);
+  page.text('Eng einbinden', left + size - 6, top + 14, { ...qt, align: 'right' });
+  page.text('Beobachten', left + 6, top + size - 7, qt);
+  page.text('Informieren', left + size - 6, top + size - 7, { ...qt, align: 'right' });
+
+  const ax = { size: 8, color: C.muted };
+  page.text('niedrig', left, top + size + 12, ax);
+  page.text('Interesse', left + half, top + size + 12, { size: 9, bold: true, align: 'center' });
+  page.text('hoch', left + size, top + size + 12, { ...ax, align: 'right' });
+  page.text('niedrig', left - 8, top + size, { ...ax, rotate: true });
+  page.text('Einfluss', left - 8, top + half, { size: 9, bold: true, rotate: true, align: 'center' });
+  page.text('hoch', left - 8, top, { ...ax, rotate: true, align: 'right' });
+
+  const placed = stakeholders.filter(isPlaced);
+  const R = 9.5;
+  // Kreise am Rand ganz in die Matrix rücken
+  const pos = (s) => [left + R + s.x * (size - 2 * R), top + R + (1 - s.y) * (size - 2 * R)];
+  for (const s of placed) {
+    const [cx, cy] = pos(s);
+    page.fill(C[s.attitude]).stroke(C.white, 1.2).circle(cx, cy, R, 'B');
+    const short = shortOf(s);
+    page.text(short, cx, cy + 2.5, { size: short.length > 2 ? 5.5 : 7, bold: true, color: C.white, align: 'center' });
+  }
+  for (const s of placed) {
+    const [cx, cy] = pos(s);
+    const name = s.name || 'Ohne Namen';
+    const w = textWidth(name, 8);
+    const x = s.x > 0.6 ? cx - 12.5 - w : cx + 12.5;
+    page.fill(C.white).rect(x - 2, cy - 6, w + 4, 11);
+    page.text(name, x, cy + 2.8, { size: 8 });
+  }
+
+  // Übersicht nach Quadranten
+  const px = left + size + 30;
+  const pw = W - margin - px;
+  const bottom = H - margin - 40;
+  let y = top + 10;
+  page.text('Übersicht', px, y, { size: 12, bold: true });
+  y += 20;
+  let truncated = false;
+  for (const q of QUADRANT_ORDER) {
+    const group = stakeholders.filter((s) => quadrantOf(s) === q);
+    if (!group.length) continue;
+    if (y > bottom) { truncated = true; break; }
+    page.text(`${q === '–' ? 'Nicht platziert' : q} (${group.length})`, px, y, { size: 9.5, bold: true });
+    y += 13;
+    const names = group.map((s) => s.name || 'Ohne Namen').join(', ');
+    for (const line of wrapText(names, pw, 9)) {
+      if (y > bottom) { truncated = true; break; }
+      page.text(line, px, y, { size: 9 });
+      y += 12;
+    }
+    y += 8;
+  }
+  if (truncated) page.text('… vollständige Liste auf den folgenden Seiten', px, bottom + 12, { size: 8, color: C.muted });
+  if (!stakeholders.length) page.text('Noch keine Stakeholder erfasst.', px, y, { size: 9, color: C.muted });
+
+  // Legende
+  let lx = px;
+  const ly = top + size - 4;
+  for (const a of ATTITUDES) {
+    page.fill(C[a.value]).circle(lx + 4, ly - 3, 4);
+    lx += 12 + page.text(a.label, lx + 12, ly, { size: 8.5, color: C.muted }) + 14;
+  }
+}
+
+function drawTablePages(pages, margin) {
+  const C = PDF_COLORS;
+  const W = 842, H = 595;
+  const cols = [
+    { label: 'Name', w: 120, get: (s) => s.name || 'Ohne Namen' },
+    { label: 'Kürzel', w: 42, get: (s) => shortOf(s) },
+    { label: 'Rolle', w: 105, get: (s) => s.role },
+    { label: 'Organisation', w: 105, get: (s) => s.org },
+    { label: 'Haltung', w: 74, get: (s) => ATTITUDES.find((a) => a.value === s.attitude).label, dot: true },
+    { label: 'Quadrant', w: 88, get: (s) => quadrantOf(s) },
+    { label: 'Notizen / Maßnahmen', w: W - 2 * margin - 534, get: (s) => s.notes },
+  ];
+  const fs = 8.5, lh = 11, pad = 4;
+  let page, y;
+
+  const startPage = () => {
+    page = new PdfPage(W, H);
+    pages.push(page);
+    page.text('Stakeholderliste', margin, margin + 14, { size: 14, bold: true });
+    y = margin + 28;
+    page.fill(C.head).rect(margin, y, W - 2 * margin, 18);
+    let x = margin;
+    for (const c of cols) {
+      page.text(c.label, x + pad, y + 12, { size: fs, bold: true });
+      x += c.w;
+    }
+    y += 18;
+  };
+
+  startPage();
+  if (!stakeholders.length) page.text('Keine Stakeholder.', margin + pad, y + 14, { size: fs, color: C.muted });
+
+  for (const s of stakeholders) {
+    const cells = cols.map((c) => wrapText(c.get(s), c.w - 2 * pad - (c.dot ? 10 : 0), fs));
+    const rowH = Math.max(...cells.map((l) => l.length)) * lh + 7;
+    if (y + rowH > H - margin - 14) startPage();
+    let x = margin;
+    cols.forEach((c, i) => {
+      let tx = x + pad;
+      if (c.dot) {
+        page.fill(C[s.attitude]).circle(tx + 3, y + 8.7, 3);
+        tx += 10;
+      }
+      cells[i].forEach((line, j) => page.text(line, tx, y + 12 + j * lh, { size: fs }));
+      x += c.w;
+    });
+    y += rowH;
+    page.stroke(C.border, 0.5).line(margin, y, W - margin, y);
+  }
+}
+
+function exportPdf() {
+  const margin = 36;
+  const pages = [new PdfPage(842, 595)];          // A4 quer
+  drawMatrixPage(pages[0], margin);
+  drawTablePages(pages, margin);
+  pages.forEach((p, i) => p.text(`Seite ${i + 1} von ${pages.length}`, p.width - margin, p.height - 18,
+    { size: 8, color: PDF_COLORS.muted, align: 'right' }));
+
+  const base = fileName ? fileName.replace(/\.json$/i, '') : 'stakeholder-map';
+  deliverFile(new Blob([buildPdf(pages)], { type: 'application/pdf' }), base + '.pdf');
+}
+
 // ---------- Events ----------
 
 $('btnNew').addEventListener('click', newFile);
 $('btnOpen').addEventListener('click', openFile);
 $('btnSave').addEventListener('click', save);
 $('btnSaveAs').addEventListener('click', saveAs);
+$('btnPdf').addEventListener('click', exportPdf);
 $('btnAdd').addEventListener('click', () => addStakeholder());
 $('askOk').addEventListener('click', () => $('askDialog').close('ok'));
 $('askCancel').addEventListener('click', () => $('askDialog').close('cancel'));
+$('btnPlaceDone').addEventListener('click', disarm);
+$('btnUnplace').addEventListener('click', () => placeArmed(null, null));
 $('btnDismiss').addEventListener('click', () => { $('reopenBanner').hidden = true; });
 $('search').addEventListener('input', renderTable);
 $('fileInput').addEventListener('change', async (e) => {
@@ -853,6 +1266,7 @@ $('fileInput').addEventListener('change', async (e) => {
 });
 
 document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && armedId && !$('askDialog').open) disarm();
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
     e.preventDefault();
     e.shiftKey ? saveAs() : save();
@@ -866,11 +1280,20 @@ window.addEventListener('beforeunload', (e) => {
   }
 });
 
+const HIDE_FALLBACK_KEY = 'stakeholder-map.hideFallbackHint';
+
 if (!HAS_FS_API) {
-  $('fallbackBanner').hidden = false;
+  let hidden = false;
+  try { hidden = localStorage.getItem(HIDE_FALLBACK_KEY) === '1'; } catch {}
+  $('fallbackBanner').hidden = hidden;
   $('btnSaveAs').hidden = true;
-  $('btnSave').textContent = 'Speichern (Download)';
+  $('btnSave').innerHTML = 'Speichern<span class="desktop-only"> (Download)</span>';
 }
+
+$('btnHideFallback').addEventListener('click', () => {
+  $('fallbackBanner').hidden = true;
+  try { localStorage.setItem(HIDE_FALLBACK_KEY, '1'); } catch {}
+});
 
 renderAll();
 offerReopen();
